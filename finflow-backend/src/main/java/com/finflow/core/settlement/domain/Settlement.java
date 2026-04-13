@@ -30,6 +30,7 @@ public class Settlement {
     @Column(name = "year", nullable = false)
     private Integer year;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private SettlementStatusEnum status;
 

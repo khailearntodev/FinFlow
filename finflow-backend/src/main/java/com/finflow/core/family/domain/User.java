@@ -7,6 +7,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
+import com.finflow.core.enums.RoleEnum;
 
 @Entity
 @Getter
@@ -30,11 +31,15 @@ public class User {
     @Column(name = "email", nullable = false, unique = true)
     private String email;
 
+    @Column(name = "password", nullable = false)
+    private String password;
+
     @Column(name = "phone_number", nullable = false, unique = true)
     private String phoneNumber;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
-    private String role;
+    private RoleEnum role;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

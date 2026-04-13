@@ -32,6 +32,7 @@ public class SettlementBill {
     @Column(name = "amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private SettlementStatusEnum status;
 
