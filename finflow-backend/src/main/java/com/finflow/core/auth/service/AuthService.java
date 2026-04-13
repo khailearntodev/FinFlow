@@ -16,11 +16,12 @@ import com.finflow.core.exception.AuthException;
 public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
     @Transactional
     public AuthResponse register(RegisterRequest registerRequest) {
         if (userRepository.findByEmail(registerRequest.getEmail()).isPresent()) {
-            throw new IllegalArgumentException("Xài i meo khác đi");
+            throw new IllegalArgumentException("Xài i meo khác đi, cái này dùng gòi");
         }
 
         User newUser = User.builder()
@@ -33,7 +34,7 @@ public class AuthService {
 
         userRepository.save(newUser);
         return AuthResponse.builder()
-                .token("tao-sau-i")
+                .token(jwtService.generateToken(newUser))
                 .email(newUser.getEmail())
                 .fullName(newUser.getFullName())
                 .build();
@@ -46,7 +47,7 @@ public class AuthService {
                 throw new AuthException("Sai mật khẩu hay gì ròi");
             }
         return AuthResponse.builder()
-                .token("tao-sau-i")
+                .token(jwtService.generateToken(user))
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .build();
