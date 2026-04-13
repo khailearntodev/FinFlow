@@ -27,6 +27,7 @@ public class AuditLog {
     @Column(name = "user_id")
     private UUID userId;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private AuditEnum action;
 

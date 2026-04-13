@@ -41,6 +41,7 @@ public class Expense {
     @Column(name = "expense_date", nullable = false)
     private LocalDate expenseDate;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private ExpenseStatus status;
 
