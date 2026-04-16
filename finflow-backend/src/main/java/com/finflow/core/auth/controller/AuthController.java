@@ -1,4 +1,4 @@
-package com.finflow.core.auth.config;
+package com.finflow.core.auth.controller;
 
 import com.finflow.core.auth.dto.AuthResponse;
 import com.finflow.core.auth.dto.LoginRequest;

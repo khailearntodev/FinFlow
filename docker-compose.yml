@@ -1,13 +1,15 @@
 services:
   postgres:
-    image: postgres:latest
+    image: postgres:16
     container_name: finflow_postgres
     environment:
-      - POSTGRES_DB=mydatabase
-      - POSTGRES_USER=myuser
-      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=finflow
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=khai
     ports:
       - "5432:5432"
+    env_file:
+      - .env
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -19,11 +21,13 @@ services:
     container_name: finflow_backend
     ports:
       - "8080:8080"
+    env_file:
+      - .env
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/mydatabase
-      - SPRING_DATASOURCE_USERNAME=myuser
-      - SPRING_DATASOURCE_PASSWORD=secret
-      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - DATABASE_URL=jdbc:postgresql://postgres:5432/finflow
+      - DATABASE_USERNAME=postgres
+      - DATABASE_PASSWORD=khai
+      - JPA_HIBERNATE_DDL_AUTO=update
     depends_on:
       - postgres
 
