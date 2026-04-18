@@ -18,6 +18,7 @@ import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -100,5 +101,55 @@ public class ExpenseService {
                 .paidByEmail(payer.getEmail())
                 .participants(participantEmails)
                 .build();
+    }
+
+    @Transactional
+    public List<ExpenseResponse> getAllExpensesByFamilyId(UUID familyId){
+        Family family = familyRepository.findById(familyId).orElseThrow(
+                () -> new ExpenseException("Không tìm thấy gia đình " + familyId)
+        );
+
+        List<Expense> expenses = expenseRepository.findByFamilyId(familyId);
+
+        return expenses.stream().map(expense -> {
+
+            User payer = userRepository.findById(UUID.fromString(expense.getPaidByUserId()))
+                    .orElseThrow(() -> new ExpenseException("Không tìm thấy người chi trả cho khoản: " + expense.getTitle()));
+
+            List<UUID> participantIds = expense.getParticipants().stream()
+                    .map(ep -> ep.getId().getUserId())
+                    .toList();
+
+            List<String> participantEmails = userRepository.findAllById(participantIds).stream()
+                    .map(User::getEmail)
+                    .toList();
+
+            return ExpenseResponse.builder()
+                    .id(expense.getId().toString())
+                    .title(expense.getTitle())
+                    .amount(expense.getAmount())
+                    .expenseDate(expense.getExpenseDate())
+                    .paidByEmail(payer.getEmail())
+                    .participants(participantEmails)
+                    .build();
+
+        }).toList();
+    }
+
+    @Transactional
+    public void deleteExpense(UUID familyId, UUID expenseId){
+        Expense expense = expenseRepository.findById(expenseId).orElseThrow(
+                () -> new ExpenseException("Không tìm thấy khoảng chi tiêu " + expenseId)
+        );
+
+        if (expense.getStatus() == ExpenseStatus.SETTLED) {
+            throw new ExpenseException("Không được xóa khoản chi đã chốt sổ");
+        }
+
+        if (!expense.getFamilyId().equals(familyId)) {
+            throw new ExpenseException("Đây không phải khoản chi thuộc về gia đình này");
+        }
+
+        expenseRepository.delete(expense);
     }
 }
