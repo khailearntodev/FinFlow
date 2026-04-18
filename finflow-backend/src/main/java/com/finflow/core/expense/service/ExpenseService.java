@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +31,16 @@ public class ExpenseService {
                 .orElseThrow(() -> new ExpenseException("Không tìm thấy người chi tiền!"));
 
         if (user.getFamily() == null) throw new ExpenseException("Người chi tiền phải thuộc về 1 gia đình!");
+
+        List<UUID> familyMemberIds = user.getFamily().getMembers().stream()
+                .map(User::getId)
+                .toList();
+
+        for (UUID participantId : expenseCreateRequest.getParticipantIDs()) {
+            if (!familyMemberIds.contains(participantId)) {
+                throw new ExpenseException("Lỗi: Người dùng có ID " + participantId + " không phải là thành viên trong gia đình của bạn!");
+            }
+        }
 
         Expense expense = Expense.builder()
                 .familyId(user.getFamily().getId())
