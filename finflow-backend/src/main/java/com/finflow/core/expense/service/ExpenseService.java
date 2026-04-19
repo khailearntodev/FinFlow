@@ -77,7 +77,7 @@ public class ExpenseService {
                 () -> new ExpenseException("Không tìm thấy gia đình " + familyId)
         );
 
-        if (family.getId().equals(expense.getFamilyId())) {
+        if (!family.getId().equals(expense.getFamilyId())) {
             throw new ExpenseException("Chi tiêu không thuộc về gia đình này");
         }
 
@@ -151,5 +151,63 @@ public class ExpenseService {
         }
 
         expenseRepository.delete(expense);
+    }
+
+    @Transactional
+    public ExpenseResponse updateExpense(UUID familyId, UUID expenseId, ExpenseCreateRequest expenseCreateRequest){
+
+        Expense expense = expenseRepository.findById(expenseId).orElseThrow(
+                () -> new ExpenseException("Không tồn tại khoản chi này")
+        );
+
+        if (!expense.getFamilyId().equals(familyId)) {
+            throw new ExpenseException("Khoản chi không thuộc về gia đình này");
+        }
+
+        if (expense.getStatus() == ExpenseStatus.SETTLED) {
+            throw new ExpenseException("Khoản chi đã được kết sổ rồi, không thể sửa");
+        }
+
+        User payer = userRepository.findByEmail(expenseCreateRequest.getPaidByEmail())
+                .orElseThrow(() -> new ExpenseException("Người thanh toán không hợp lệ"));
+
+        if (payer.getFamily() == null || !payer.getFamily().getId().equals(familyId)) {
+            throw new ExpenseException("Người thanh toán phải là thành viên trong gia đình");
+        }
+
+        List<UUID> familyMemberIds = payer.getFamily().getMembers().stream()
+                .map(User::getId)
+                .toList();
+
+        for (UUID participantId : expenseCreateRequest.getParticipantIDs()) {
+            if (!familyMemberIds.contains(participantId)) {
+                throw new ExpenseException("Người được chia tiền (ID: " + participantId + ") không nằm trong gia đình!");
+            }
+        }
+
+        expense.setTitle(expenseCreateRequest.getTitle());
+        expense.setAmount(expenseCreateRequest.getAmount());
+        expense.setExpenseDate(expenseCreateRequest.getExpenseDate());
+        expense.setPaidByUserId(payer.getId().toString());
+
+        expenseParticipantRepository.deleteAll(expense.getParticipants());
+
+        List<ExpenseParticipant> newParticipants = expenseCreateRequest.getParticipantIDs().stream()
+                .map(userId -> new ExpenseParticipant(expense, userId))
+                .toList();
+
+        expenseParticipantRepository.saveAll(newParticipants);
+
+        List<String> participantEmails = userRepository.findAllById(expenseCreateRequest.getParticipantIDs())
+                .stream().map(User::getEmail).toList();
+
+        return ExpenseResponse.builder()
+                .id(expenseId.toString())
+                .title(expense.getTitle())
+                .amount(expense.getAmount())
+                .expenseDate(expense.getExpenseDate())
+                .paidByEmail(payer.getEmail())
+                .participants(participantEmails)
+                .build();
     }
 }
