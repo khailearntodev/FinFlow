@@ -34,9 +34,20 @@ public class ExpenseController {
         return ResponseEntity.ok(expenseService.getAllExpensesByFamilyId(familyId));
     }
 
-    @DeleteMapping("/delete/{id}")
-    public ResponseEntity<String> deleteExpenseById(@RequestParam("expenseId") UUID expenseId, @RequestParam("familyId") UUID familyId) {
+    @DeleteMapping("/{expenseId}")
+    public ResponseEntity<String> deleteExpenseById(@PathVariable UUID expenseId,
+                                                    @RequestParam("familyId") UUID familyId) {
         expenseService.deleteExpense(familyId, expenseId);
-        return ResponseEntity.ok("Đã xoa khoản chi thành công")
+        return ResponseEntity.ok("Đã xóa khoản chi thành công");
+    }
+
+    @PutMapping("/update")
+    public ResponseEntity<ExpenseResponse> updateExpense(
+            @RequestParam("familyId") UUID familyId,
+            @RequestParam("expenseId") UUID expenseId,
+            @Valid @RequestBody ExpenseCreateRequest request) {
+
+        ExpenseResponse updatedExpense = expenseService.updateExpense(familyId, expenseId, request);
+        return ResponseEntity.ok(updatedExpense);
     }
 }
