@@ -16,7 +16,7 @@ import java.util.UUID;
 @RequestMapping("/api/expense")
 @RequiredArgsConstructor
 public class ExpenseController {
-    public final ExpenseService expenseService;
+    private final ExpenseService expenseService;
 
     @PostMapping("/create")
     public ResponseEntity<String> createExpense(@Valid @RequestBody ExpenseCreateRequest expenseCreateRequest) {
