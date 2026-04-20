@@ -55,10 +55,8 @@ public class SettlementService {
             throw new ExpenseException("Chỉ chủ hộ của gia đình mới được tạo Kết sổ");
         }
 
-        if (settlementRepository.findByFamilyIdAfterAndMonthAndYear(UUID.fromString(settlementCreateRequest.getFamilyId()),
-                settlementCreateRequest.getMonth(), settlementCreateRequest.getYear()))
-        {
-            throw new SettlementException("Một tháng chỉ được kết sổ 1 lần");
+        if (settlementRepository.findByFamilyIdAndMonthAndYear(family.getId(), settlementCreateRequest.getMonth(), settlementCreateRequest.getYear()).isPresent()) {
+            throw new SettlementException("Tháng này đã được chốt sổ rồi!");
         }
 
         List<Expense> pendingExpenses = expenseRepository.findByFamilyId(UUID.fromString(settlementCreateRequest.getFamilyId()))
