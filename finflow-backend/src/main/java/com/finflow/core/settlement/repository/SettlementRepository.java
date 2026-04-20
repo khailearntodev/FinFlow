@@ -9,7 +9,5 @@ import java.util.UUID;
 
 @Repository
 public interface SettlementRepository extends JpaRepository<Settlement, UUID> {
-    Optional<Settlement> findBySettlementIdAndMonthAndYear(String settlementId, Integer month, Integer year);
-
-    boolean findByFamilyIdAfterAndMonthAndYear(UUID familyIdAfter, Integer month, Integer year);
+    Optional<Settlement> findByFamilyIdAndMonthAndYear(UUID familyIdAfter, Integer month, Integer year);
 }
