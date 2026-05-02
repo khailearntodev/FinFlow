@@ -1,5 +1,6 @@
 package com.finflow.core.settlement.domain;
 
+import com.finflow.core.enums.SettlementBillStatusEnum;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -34,7 +35,7 @@ public class SettlementBill {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private SettlementStatusEnum status;
+    private SettlementBillStatusEnum status;
 
     @Column(name = "proof_image_url", nullable = true)
     private String proofImageUrl;

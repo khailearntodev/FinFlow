@@ -6,6 +6,7 @@ import com.finflow.core.enums.SettlementBillStatusEnum;
 import com.finflow.core.enums.SettlementStatusEnum;
 import com.finflow.core.exception.ExpenseException;
 import com.finflow.core.exception.SettlementException;
+import com.finflow.core.exception.StorageException;
 import com.finflow.core.expense.domain.Expense;
 import com.finflow.core.expense.domain.ExpenseParticipant;
 import com.finflow.core.expense.dto.ExpenseResponse;
@@ -22,9 +23,11 @@ import com.finflow.core.settlement.dto.SettlementCreateRequest;
 import com.finflow.core.settlement.dto.SettlementResponse;
 import com.finflow.core.settlement.repository.SettlementBillRepository;
 import com.finflow.core.settlement.repository.SettlementRepository;
+import com.finflow.core.storage.service.StorageService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -38,6 +41,8 @@ public class SettlementService {
     private final UserRepository userRepository;
     private final FamilyRepository familyRepository;
     private final ExpenseRepository expenseRepository;
+
+    private final StorageService storageService;
 
     @Transactional
     public SettlementResponse createSettlement(SettlementCreateRequest settlementCreateRequest) {
@@ -123,7 +128,7 @@ public class SettlementService {
                     .settlement(settlement)
                     .userId(memberId)
                     .amount(netAmount)
-                    .status(SettlementStatusEnum.PENDING)
+                    .status(SettlementBillStatusEnum.PENDING)
                     .build();
 
             billsToSave.add(bill);
@@ -158,5 +163,68 @@ public class SettlementService {
                 .createdAt(settlement.getCreatedAt())
                 .bills(billDetails)
                 .build();
+    }
+
+    @Transactional
+    public String submitPaymentProof(UUID billId, String userEmail, MultipartFile proofFile) {
+        User user = userRepository.findByEmail(userEmail).orElseThrow(
+                () -> new SettlementException("Không tìm thấy người dùng")
+        );
+
+        SettlementBill bill = settlementBillRepository.findById(billId).orElseThrow(
+                () -> new SettlementException("Không tìm thấy hóa đơn")
+        );
+
+        if (bill.getStatus() != SettlementBillStatusEnum.PENDING) {
+            throw new SettlementException("Hóa đơn không hợp lệ, vui lòng chọn đúng hóa đơn tháng này");
+        }
+
+        if (user.getFamily() == null || !user.getFamily().getId().equals(bill.getSettlement().getFamilyId())) {
+            throw new SettlementException("Hóa đơn phải thuộc về gia đình này");
+        }
+
+        if (!user.getId().equals(bill.getUserId())) {
+            throw new SettlementException("Bạn chỉ có thể nộp minh chứng cho chính mình");
+        }
+
+        String proofUrl = storageService.uploadImage(proofFile);
+
+        bill.setProofImageUrl(proofUrl);
+        bill.setStatus(SettlementBillStatusEnum.WAITING_FOR_CONFIRMATION);
+        settlementBillRepository.save(bill);
+
+        return "Nộp minh chứng thành công! Đang đợi chủ hộ xác nhận!";
+    }
+
+    @Transactional
+    public String confirmPayment(UUID billId, String headEmail) {
+        User head = userRepository.findByEmail(headEmail).orElseThrow(
+                () -> new SettlementException("Không tìm thấy chủ hộ")
+        );
+
+        SettlementBill bill = settlementBillRepository.findById(billId).orElseThrow(
+                () -> new SettlementException("Không tìm thấy hóa đơn!")
+        );
+
+        Settlement settlement = bill.getSettlement();
+
+        if (head.getRole() != RoleEnum.HEAD || !head.getFamily().getId().equals(bill.getSettlement().getFamilyId())) {
+            throw new SettlementException("Chỉ có chủ hộ mới có quyền xác nhận thanh toán");
+        }
+
+        if (bill.getStatus() != SettlementBillStatusEnum.WAITING_FOR_CONFIRMATION) {
+            throw new SettlementException("Hóa đơn này chưa có minh chứng thanh toán");
+        }
+
+        bill.setStatus(SettlementBillStatusEnum.COMPLETED);
+        settlementBillRepository.save(bill);
+
+        boolean isAllCompleted = settlement.getSettlementBills().stream()
+                .allMatch(b -> b.getStatus() == SettlementBillStatusEnum.COMPLETED);
+        if (isAllCompleted) {
+            settlement.setStatus(SettlementStatusEnum.COMPLETED);
+            settlementRepository.save(settlement);
+        }
+        return "Xác nhận thanh toán thành công!";
     }
 }
