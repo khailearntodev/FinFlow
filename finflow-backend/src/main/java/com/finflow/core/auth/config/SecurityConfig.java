@@ -23,7 +23,17 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(request -> {
                     var corsConfiguration = new org.springframework.web.cors.CorsConfiguration();
-                    corsConfiguration.setAllowedOrigins(java.util.List.of("http://localhost:3000"));
+                    
+                    java.util.List<String> allowedOrigins = new java.util.ArrayList<>();
+                    allowedOrigins.add("http://localhost:3000");
+                    allowedOrigins.add("https://fin-flow-seven-phi.vercel.app");
+                    
+                    String envOrigins = System.getenv("ALLOWED_ORIGINS");
+                    if (envOrigins != null && !envOrigins.isEmpty()) {
+                        allowedOrigins.addAll(java.util.Arrays.asList(envOrigins.split(",")));
+                    }
+                    
+                    corsConfiguration.setAllowedOrigins(allowedOrigins);
                     corsConfiguration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                     corsConfiguration.setAllowedHeaders(java.util.List.of("*"));
                     corsConfiguration.setAllowCredentials(true);
