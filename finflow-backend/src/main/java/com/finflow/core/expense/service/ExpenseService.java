@@ -59,16 +59,16 @@ public class ExpenseService {
                 .paidByUserId(user.getId().toString())
                 .build();
 
-        expenseRepository.save(expense);
-
-        List<ExpenseParticipant> participants = expenseCreateRequest.getParticipantIDs()
-                .stream()
-                .map(userId -> new ExpenseParticipant(expense,userId))
-                .toList();
-
-        expenseParticipantRepository.saveAll(participants);
+        List<ExpenseParticipant> participants = new ArrayList<>(
+                expenseCreateRequest.getParticipantIDs()
+                        .stream()
+                        .distinct()
+                        .map(userId -> new ExpenseParticipant(expense, userId))
+                        .toList()
+        );
 
         expense.setParticipants(participants);
+        expenseRepository.save(expense);
 
         auditService.logExpenseChange(
                 user.getFamily().getId(),
@@ -146,6 +146,7 @@ public class ExpenseService {
                     .expenseDate(expense.getExpenseDate())
                     .paidByEmail(payer.getEmail())
                     .participants(participantEmails)
+                    .status(expense.getStatus())
                     .build();
 
         }).toList();
@@ -190,23 +191,34 @@ public class ExpenseService {
     }
 
     @Transactional
-    public ExpenseResponse updateExpense(UUID familyId, UUID expenseId, ExpenseCreateRequest expenseCreateRequest){
-
+    public ExpenseResponse updateExpense(UUID familyId, UUID expenseId, ExpenseCreateRequest expenseCreateRequest, UUID userId){
+ 
         Expense expense = expenseRepository.findById(expenseId).orElseThrow(
                 () -> new ExpenseException("Không tồn tại khoản chi này")
         );
-
+ 
+        User user = userRepository.findById(userId).orElseThrow(
+                () -> new ExpenseException("Không tìm thấy người dùng thực hiện yêu cầu")
+        );
+ 
         if (!expense.getFamilyId().equals(familyId)) {
             throw new ExpenseException("Khoản chi không thuộc về gia đình này");
         }
-
+ 
         if (expense.getStatus() == ExpenseStatus.SETTLED) {
             throw new ExpenseException("Khoản chi đã được kết sổ rồi, không thể sửa");
         }
-
+ 
+        boolean isNotPayer = !userId.toString().equals(expense.getPaidByUserId());
+        boolean isNotHead = user.getRole() != RoleEnum.HEAD;
+ 
+        if (isNotPayer && isNotHead) {
+            throw new ExpenseException("Chỉ người chi trả hoặc chủ hộ mới được sửa khoản chi");
+        }
+ 
         User payer = userRepository.findByEmail(expenseCreateRequest.getPaidByEmail())
                 .orElseThrow(() -> new ExpenseException("Người thanh toán không hợp lệ"));
-
+ 
         if (payer.getFamily() == null || !payer.getFamily().getId().equals(familyId)) {
             throw new ExpenseException("Người thanh toán phải là thành viên trong gia đình");
         }
@@ -228,17 +240,14 @@ public class ExpenseService {
         expense.setExpenseDate(expenseCreateRequest.getExpenseDate());
         expense.setPaidByUserId(payer.getId().toString());
 
-        expenseRepository.save(expense);
-
-        expenseParticipantRepository.deleteAll(expense.getParticipants());
-
+        expense.getParticipants().clear();
         List<ExpenseParticipant> newParticipants = expenseCreateRequest.getParticipantIDs().stream()
-                .map(userId -> new ExpenseParticipant(expense, userId))
+                .distinct()
+                .map(participantId -> new ExpenseParticipant(expense, participantId))
                 .toList();
+        expense.getParticipants().addAll(newParticipants);
 
-        expenseParticipantRepository.saveAll(newParticipants);
-
-        expense.setParticipants(newParticipants);
+        expenseRepository.save(expense);
 
         Map<String, Object> newData = extractExpenseSnapshot(expense);
 

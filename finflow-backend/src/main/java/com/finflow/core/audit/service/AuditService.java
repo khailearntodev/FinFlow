@@ -43,4 +43,8 @@ public class AuditService {
         }
     }
 
+    @Transactional
+    public java.util.List<AuditLog> getLogsByFamilyId(UUID familyId) {
+        return auditLogRepository.findByFamilyId(familyId);
+    }
 }

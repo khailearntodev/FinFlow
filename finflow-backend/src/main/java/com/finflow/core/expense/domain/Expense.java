@@ -7,6 +7,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import com.finflow.core.enums.ExpenseStatus;
@@ -50,5 +51,6 @@ public class Expense {
     private ZonedDateTime createdAt;
 
     @OneToMany(mappedBy = "expense", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ExpenseParticipant> participants;
+    @Builder.Default
+    private List<ExpenseParticipant> participants = new ArrayList<>();
 }

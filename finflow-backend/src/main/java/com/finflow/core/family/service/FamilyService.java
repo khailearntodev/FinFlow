@@ -8,6 +8,7 @@ import com.finflow.core.family.dto.AddMemberRequest;
 import com.finflow.core.family.dto.FamilyCreateRequest;
 import com.finflow.core.family.dto.FamilyResponse;
 import com.finflow.core.family.dto.RevokeMemberRequest;
+import com.finflow.core.family.dto.FamilyUpdateRequest;
 import com.finflow.core.family.repository.FamilyRepository;
 import com.finflow.core.family.repository.UserRepository;
 import jakarta.transaction.Transactional;
@@ -79,7 +80,7 @@ public class FamilyService {
 
     @Transactional
     public void addMemberToFamily(AddMemberRequest addMemberRequest){
-        List<String> emails = addMemberRequest.getUserEmail();
+        List<String> emails = addMemberRequest.getUserEmail().stream().distinct().toList();
         UUID familyId = addMemberRequest.getFamilyId();
         String adderEmail = addMemberRequest.getAdderEmail();
 
@@ -91,21 +92,17 @@ public class FamilyService {
         }
 
         for (String email: emails) {
-            if (userRepository.findByEmail(email).isPresent()) {
-                User newMember = userRepository.findByEmail(email).get();
-                if (newMember.getRole() != RoleEnum.USER){
-                    throw new FamilyException("Người được thêm vào gia đình phải là thành viên");
-                }
-                if (newMember.getFamily() != null) {
-                    throw new FamilyException("Người được mời không được ở gia đình khác");
-                }
-                family.getMembers().add(newMember);
-                newMember.setRole(RoleEnum.USER);
+            User newMember = userRepository.findByEmail(email).orElseThrow(() -> new FamilyException("Người dùng " + email + " không tồn tại\n"));
+            if (newMember.getRole() != RoleEnum.USER){
+                throw new FamilyException("Người được thêm vào gia đình phải là thành viên");
             }
-            else throw new FamilyException("Người dùng " + email + " không tồn tại\n");
+            if (newMember.getFamily() != null) {
+                throw new FamilyException("Người được mời không được ở gia đình khác");
+            }
+            newMember.setFamily(family);
+            newMember.setRole(RoleEnum.USER);
+            family.getMembers().add(newMember);
         }
-
-        family.getMembers().forEach(user -> user.setFamily(family));
 
         familyRepository.save(family);
         userRepository.saveAll(family.getMembers());
@@ -141,5 +138,28 @@ public class FamilyService {
 
         familyRepository.save(family);
         userRepository.saveAll(evictedMembers);
+    }
+    @Transactional
+    public FamilyResponse updateFamily(FamilyUpdateRequest updateRequest) {
+        Family family = familyRepository.findById(UUID.fromString(updateRequest.getFamilyId()))
+                .orElseThrow(() -> new FamilyException("Không tìm thấy gia đình"));
+ 
+        User head = userRepository.findByEmail(updateRequest.getRequestEmail())
+                .orElseThrow(() -> new FamilyException("Không tìm thấy người dùng thực hiện yêu cầu"));
+ 
+        if (head.getRole() != RoleEnum.HEAD || !family.getMembers().contains(head)) {
+            throw new FamilyException("Chỉ chủ hộ mới có quyền thay đổi thiết lập gia đình");
+        }
+ 
+        family.setName(updateRequest.getName());
+        family.setBillingDate(updateRequest.getBillingDate());
+        familyRepository.save(family);
+ 
+        return FamilyResponse.builder()
+                .id(family.getId())
+                .name(family.getName())
+                .billingDate(family.getBillingDate())
+                .message("Cập nhật thiết lập gia đình thành công")
+                .build();
     }
 }

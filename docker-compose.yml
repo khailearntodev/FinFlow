@@ -1,19 +1,5 @@
 services:
-  postgres:
-    image: postgres:16
-    container_name: finflow_postgres
-    environment:
-      - POSTGRES_DB=finflow
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=khai
-    ports:
-      - "5432:5432"
-    env_file:
-      - .env
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-
-  # 2. Backend Service (Spring Boot)
+  # 1. Backend Service (Spring Boot)
   backend:
     build:
       context: ./finflow-backend
@@ -23,26 +9,18 @@ services:
       - "8080:8080"
     env_file:
       - .env
+
+  # 2. Frontend Service (Next.js)
+  frontend:
+    build:
+      context: ./finflow-frontend
+      dockerfile: Dockerfile
+    container_name: finflow_frontend
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=jdbc:postgresql://postgres:5432/finflow
-      - DATABASE_USERNAME=postgres
-      - DATABASE_PASSWORD=khai
-      - JPA_HIBERNATE_DDL_AUTO=update
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
     depends_on:
-      - postgres
-
-  # 3. Frontend Service (Next.js)
-#  frontend:
-#    build:
-#      context: ./finflow-frontend
-#      dockerfile: Dockerfile
-#    container_name: finflow_frontend
-#    ports:
-#      - "3000:3000"
-#    environment:
-#      - NEXT_PUBLIC_API_URL=http://localhost:8080 # Trỏ API gọi về Backend
-#    depends_on:
-#      - backend
-
-volumes:
-  pgdata:
+      - backend

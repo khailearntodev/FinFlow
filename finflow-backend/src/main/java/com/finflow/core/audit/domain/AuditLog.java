@@ -7,6 +7,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 import com.finflow.core.enums.AuditEnum;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "audit_logs")
@@ -37,9 +39,11 @@ public class AuditLog {
     @Column(name = "entity_id", nullable = false)
     private UUID entityId;
 
-     @Column(name = "old_values", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "old_values", columnDefinition = "jsonb")
     private String oldValues;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "new_values", columnDefinition = "jsonb")
     private String newValues;
 

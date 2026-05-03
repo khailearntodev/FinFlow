@@ -19,8 +19,8 @@ public class ExpenseCreateRequest {
     @NotBlank(message = "Tiêu đề không được để trống")
     private String title;
 
-    @NotBlank(message = "Số tiền không được trống")
-    @Min(value = 1000, message = "Số tiền phải lớn hơn 1000VND")
+    @NotNull(message = "Số tiền không được trống")
+    @DecimalMin(value = "1000", message = "Số tiền phải lớn hơn 1000VND")
     private BigDecimal amount;
 
     @PastOrPresent(message = "Ngày chi tiêu chỉ có thể là quá khứ hoặc hiện tại")

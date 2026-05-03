@@ -28,6 +28,7 @@ public class ExpenseParticipant {
     }
 
     @EmbeddedId
+    @Builder.Default
     private ParticipantId id = new ParticipantId();
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -36,6 +37,7 @@ public class ExpenseParticipant {
     private Expense expense;
 
     public ExpenseParticipant(Expense expense, UUID userId) {
+        this.id = new ParticipantId();
         this.expense = expense;
         this.id.setExpenseId(expense.getId());
         this.id.setUserId(userId);

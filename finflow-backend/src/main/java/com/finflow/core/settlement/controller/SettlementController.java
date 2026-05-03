@@ -1,5 +1,6 @@
 package com.finflow.core.settlement.controller;
 
+import com.finflow.core.settlement.dto.BillDetail;
 import com.finflow.core.settlement.dto.SettlementCreateRequest;
 import com.finflow.core.settlement.dto.SettlementResponse;
 import com.finflow.core.settlement.service.SettlementService;
@@ -10,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -40,5 +42,21 @@ public class SettlementController {
 
         String result = settlementService.confirmPayment(billId, email);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/family/{familyId}")
+    public ResponseEntity<List<SettlementResponse>> getSettlements(@PathVariable UUID familyId) {
+        return ResponseEntity.ok(settlementService.getSettlementsByFamilyId(familyId));
+    }
+
+    @GetMapping("/bills/user/{userId}")
+    public ResponseEntity<List<BillDetail>> getMyBills(@PathVariable UUID userId) {
+        return ResponseEntity.ok(settlementService.getBillsByUserId(userId));
+    }
+    @DeleteMapping("/{settlementId}/cancel")
+    public ResponseEntity<String> cancelSettlement(
+            @PathVariable UUID settlementId,
+            @RequestParam("email") String email) {
+        return ResponseEntity.ok(settlementService.cancelSettlement(settlementId, email));
     }
 }
