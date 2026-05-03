@@ -9,6 +9,9 @@ import com.finflow.core.family.dto.FamilyCreateRequest;
 import com.finflow.core.family.dto.FamilyResponse;
 import com.finflow.core.family.dto.RevokeMemberRequest;
 import com.finflow.core.family.dto.FamilyUpdateRequest;
+import com.finflow.core.audit.repository.AuditLogRepository;
+import com.finflow.core.expense.repository.ExpenseRepository;
+import com.finflow.core.settlement.repository.SettlementRepository;
 import com.finflow.core.family.repository.FamilyRepository;
 import com.finflow.core.family.repository.UserRepository;
 import jakarta.transaction.Transactional;
@@ -25,6 +28,9 @@ import java.util.UUID;
 public class FamilyService {
     private final FamilyRepository familyRepository;
     private final UserRepository userRepository;
+    private final ExpenseRepository expenseRepository;
+    private final SettlementRepository settlementRepository;
+    private final AuditLogRepository auditLogRepository;
 
     @Transactional
     public FamilyResponse createFamily(FamilyCreateRequest familyCreateRequest) {
@@ -67,14 +73,21 @@ public class FamilyService {
         }
 
         Family familyToDelete = deleter.getFamily();
-        List<User> users = familyToDelete.getMembers();
+        UUID familyId = familyToDelete.getId();
 
+        auditLogRepository.deleteByFamilyId(familyId);
+
+        settlementRepository.deleteByFamilyId(familyId);
+
+        expenseRepository.deleteByFamilyId(familyId);
+
+        List<User> users = familyToDelete.getMembers();
         for (User user: users) {
             user.setRole(RoleEnum.USER);
             user.setFamily(null);
         }
-
         userRepository.saveAll(users);
+
         familyRepository.delete(familyToDelete);
     }
 

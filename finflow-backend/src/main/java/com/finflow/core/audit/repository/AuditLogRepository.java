@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface AuditLogRepository extends JpaRepository<AuditLog, UUID> {
     List<AuditLog> findByFamilyId(UUID familyId);
+    void deleteByFamilyId(UUID familyId);
 }
