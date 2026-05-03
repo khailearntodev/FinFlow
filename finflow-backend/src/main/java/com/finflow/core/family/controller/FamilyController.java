@@ -4,6 +4,7 @@ import com.finflow.core.family.dto.AddMemberRequest;
 import com.finflow.core.family.dto.FamilyCreateRequest;
 import com.finflow.core.family.dto.FamilyResponse;
 import com.finflow.core.family.dto.RevokeMemberRequest;
+import com.finflow.core.family.dto.FamilyUpdateRequest;
 import com.finflow.core.family.service.FamilyService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
@@ -43,5 +44,10 @@ public class FamilyController {
         familyService.evictMember(revokeMemberRequest);
         String emailToString = String.join(", ", revokeMemberRequest.getUserEmail());
         return ResponseEntity.ok("Đã đuổi thành viên " + emailToString + " ra khỏi nhà!");
+    }
+ 
+    @PutMapping("/update")
+    public ResponseEntity<FamilyResponse> updateFamily(@RequestBody @Valid FamilyUpdateRequest updateRequest) {
+        return ResponseEntity.ok(familyService.updateFamily(updateRequest));
     }
 }

@@ -46,9 +46,10 @@ public class ExpenseController {
     public ResponseEntity<ExpenseResponse> updateExpense(
             @RequestParam("familyId") UUID familyId,
             @RequestParam("expenseId") UUID expenseId,
+            @RequestParam("userId") UUID userId,
             @Valid @RequestBody ExpenseCreateRequest request) {
 
-        ExpenseResponse updatedExpense = expenseService.updateExpense(familyId, expenseId, request);
+        ExpenseResponse updatedExpense = expenseService.updateExpense(familyId, expenseId, request, userId);
         return ResponseEntity.ok(updatedExpense);
     }
 }

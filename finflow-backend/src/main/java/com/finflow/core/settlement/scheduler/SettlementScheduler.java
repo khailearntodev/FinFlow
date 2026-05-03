@@ -28,8 +28,11 @@ public class SettlementScheduler {
 
         LocalDate today = LocalDate.now();
         int currentDay = today.getDayOfMonth();
-        int currentMonth = today.getMonthValue();
-        int currentYear = today.getYear();
+        
+        // Chốt sổ cho tháng trước đó
+        LocalDate lastMonthDate = today.minusMonths(1);
+        int settleMonth = lastMonthDate.getMonthValue();
+        int settleYear = lastMonthDate.getYear();
 
         List<Family> familiesToSettle = familyRepository.findByBillingDate(currentDay);
         if (familiesToSettle.isEmpty()) {
@@ -42,8 +45,8 @@ public class SettlementScheduler {
         for (Family family : familiesToSettle) {
             try {
                 SettlementCreateRequest request = SettlementCreateRequest.builder()
-                        .month(currentMonth)
-                        .year(currentYear)
+                        .month(settleMonth)
+                        .year(settleYear)
                         .holdEmail(getHeadEmail(family))
                         .familyId(String.valueOf(family.getId()))
                         .build();

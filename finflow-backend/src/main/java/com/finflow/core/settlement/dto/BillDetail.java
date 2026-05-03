@@ -13,8 +13,12 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class BillDetail {
+    private java.util.UUID id;
     private String userEmail;
     private String fullName;
     private BigDecimal amount;
     private SettlementBillStatusEnum status;
+    private String proofImageUrl;
+    private Integer month;
+    private Integer year;
 }

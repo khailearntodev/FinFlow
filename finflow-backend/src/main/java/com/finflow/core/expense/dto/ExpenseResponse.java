@@ -36,4 +36,6 @@ public class ExpenseResponse {
     private String paidByEmail;
 
     private List<String> participants;
+
+    private com.finflow.core.enums.ExpenseStatus status;
 }
