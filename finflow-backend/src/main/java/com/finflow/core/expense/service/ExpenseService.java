@@ -1,6 +1,9 @@
 package com.finflow.core.expense.service;
 
+import com.finflow.core.audit.service.AuditService;
+import com.finflow.core.enums.AuditEnum;
 import com.finflow.core.enums.ExpenseStatus;
+import com.finflow.core.enums.RoleEnum;
 import com.finflow.core.exception.ExpenseException;
 import com.finflow.core.exception.FamilyException;
 import com.finflow.core.expense.domain.Expense;
@@ -18,9 +21,8 @@ import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
+import javax.management.relation.Role;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +31,7 @@ public class ExpenseService {
     public final UserRepository userRepository;
     private final ExpenseRepository expenseRepository;
     private final FamilyRepository familyRepository;
+    private final AuditService auditService;
 
     @Transactional
     public String createExpense(ExpenseCreateRequest expenseCreateRequest) {
@@ -62,8 +65,20 @@ public class ExpenseService {
                 .stream()
                 .map(userId -> new ExpenseParticipant(expense,userId))
                 .toList();
-        
+
         expenseParticipantRepository.saveAll(participants);
+
+        expense.setParticipants(participants);
+
+        auditService.logExpenseChange(
+                user.getFamily().getId(),
+                user.getId(),
+                AuditEnum.CREATE,
+                expense.getId(),
+                null,
+                extractExpenseSnapshot(expense)
+        );
+
         return "Đã ghi nhận khoản chi " + expense.getAmount() + " của " + user.getFullName() + " thành công!";
     }
 
@@ -137,20 +152,41 @@ public class ExpenseService {
     }
 
     @Transactional
-    public void deleteExpense(UUID familyId, UUID expenseId){
+    public void deleteExpense(UUID familyId, UUID expenseId, UUID userId){
         Expense expense = expenseRepository.findById(expenseId).orElseThrow(
                 () -> new ExpenseException("Không tìm thấy khoảng chi tiêu " + expenseId)
+        );
+
+        User user = userRepository.findById(userId).orElseThrow(
+                () -> new ExpenseException("Không tìm thấy người dùng")
         );
 
         if (expense.getStatus() == ExpenseStatus.SETTLED) {
             throw new ExpenseException("Không được xóa khoản chi đã chốt sổ");
         }
 
+        boolean isNotPayer = !userId.toString().equals(expense.getPaidByUserId());
+        boolean isNotHead = user.getRole() != RoleEnum.HEAD;
+
+        if (isNotPayer && isNotHead) {
+            throw new ExpenseException("Chỉ người chi trả hoặc chủ hộ mới được xóa khoản chi");
+        }
+
         if (!expense.getFamilyId().equals(familyId)) {
             throw new ExpenseException("Đây không phải khoản chi thuộc về gia đình này");
         }
+        Map<String, Object> oldData = extractExpenseSnapshot(expense);
 
         expenseRepository.delete(expense);
+
+        auditService.logExpenseChange(
+                expense.getFamilyId(),
+                userId,
+                AuditEnum.DELETE,
+                expense.getId(),
+                oldData,
+                null
+        );
     }
 
     @Transactional
@@ -175,6 +211,8 @@ public class ExpenseService {
             throw new ExpenseException("Người thanh toán phải là thành viên trong gia đình");
         }
 
+        Map<String, Object> oldData = extractExpenseSnapshot(expense);
+
         List<UUID> familyMemberIds = payer.getFamily().getMembers().stream()
                 .map(User::getId)
                 .toList();
@@ -190,6 +228,8 @@ public class ExpenseService {
         expense.setExpenseDate(expenseCreateRequest.getExpenseDate());
         expense.setPaidByUserId(payer.getId().toString());
 
+        expenseRepository.save(expense);
+
         expenseParticipantRepository.deleteAll(expense.getParticipants());
 
         List<ExpenseParticipant> newParticipants = expenseCreateRequest.getParticipantIDs().stream()
@@ -197,6 +237,19 @@ public class ExpenseService {
                 .toList();
 
         expenseParticipantRepository.saveAll(newParticipants);
+
+        expense.setParticipants(newParticipants);
+
+        Map<String, Object> newData = extractExpenseSnapshot(expense);
+
+        auditService.logExpenseChange(
+                expense.getFamilyId(),
+                payer.getId(),
+                AuditEnum.UPDATE,
+                expense.getId(),
+                oldData,
+                newData
+        );
 
         List<String> participantEmails = userRepository.findAllById(expenseCreateRequest.getParticipantIDs())
                 .stream().map(User::getEmail).toList();
@@ -209,5 +262,25 @@ public class ExpenseService {
                 .paidByEmail(payer.getEmail())
                 .participants(participantEmails)
                 .build();
+    }
+
+    private Map<String, Object> extractExpenseSnapshot(Expense expense) {
+        if (expense == null) return null;
+
+        Map<String, Object> snapshot = new HashMap<>();
+        snapshot.put("title", expense.getTitle());
+        snapshot.put("amount", expense.getAmount());
+        snapshot.put("expenseDate", expense.getExpenseDate().toString());
+        snapshot.put("paidByUserId", expense.getPaidByUserId());
+        snapshot.put("status", expense.getStatus());
+
+        if (expense.getParticipants() != null) {
+            List<String> participantIds = expense.getParticipants().stream()
+                    .map(p -> p.getId().getUserId().toString())
+                    .toList();
+            snapshot.put("participants", participantIds);
+        }
+
+        return snapshot;
     }
 }
