@@ -36,8 +36,9 @@ public class ExpenseController {
 
     @DeleteMapping("/{expenseId}")
     public ResponseEntity<String> deleteExpenseById(@PathVariable UUID expenseId,
-                                                    @RequestParam("familyId") UUID familyId) {
-        expenseService.deleteExpense(familyId, expenseId);
+                                                    @RequestParam("familyId") UUID familyId,
+                                                    @RequestParam("userId") UUID userId) {
+        expenseService.deleteExpense(familyId, expenseId, userId);
         return ResponseEntity.ok("Đã xóa khoản chi thành công");
     }
 
