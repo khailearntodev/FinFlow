@@ -12,4 +12,5 @@ import java.util.UUID;
 public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
     Optional<Expense> findById(UUID expenseId);
     List<Expense> findByFamilyId(UUID familyId);
+    void deleteByFamilyId(UUID familyId);
 }
