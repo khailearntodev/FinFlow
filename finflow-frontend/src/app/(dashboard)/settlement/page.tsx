@@ -70,12 +70,14 @@ export default function SettlementPage() {
           await settlementService.create({
             familyId: user.family.id,
             holdEmail: user.email,
-            month: selectedMonth,
-            year: selectedYear
+            month: targetMonth,
+            year: targetYear
           });
           fetchSettlements();
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
         } catch (error: any) {
           alert(error.response?.data?.message || 'Không thể chốt sổ');
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
         }
       }
     });
@@ -91,8 +93,10 @@ export default function SettlementPage() {
         try {
           await settlementService.cancel(settlementId, user.email);
           fetchSettlements();
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
         } catch (error: any) {
           alert(error.response?.data?.message || 'Không thể hủy chốt sổ');
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
         }
       }
     });
@@ -100,11 +104,18 @@ export default function SettlementPage() {
 
   const isHead = user?.role === 'HEAD';
   
+  const targetMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
+  const targetYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
+  
   const filteredSettlements = settlements.filter(s => 
-    s.month === selectedMonth && s.year === selectedYear
+    s.month === targetMonth && s.year === targetYear
   );
   
   const currentSettlement = filteredSettlements.length > 0 ? filteredSettlements[0] : null;
+
+  const getLastDayOfMonth = (year: number, month: number) => {
+    return new Date(year, month, 0).getDate();
+  };
 
   if (loading) {
     return (
@@ -164,13 +175,13 @@ export default function SettlementPage() {
             </select>
           </div>
 
-          {isHead && !currentSettlement && (
+            {isHead && !currentSettlement && (
             <button 
               onClick={handleCreateSettlement}
               className="flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-6 py-4 font-bold text-white shadow-xl shadow-slate-200 hover:bg-black transition-all active:scale-95 w-full sm:w-auto"
             >
               <Calendar className="h-5 w-5" />
-              Chốt sổ tháng {selectedMonth}
+              Chốt sổ tháng {targetMonth}
             </button>
           )}
         </div>
@@ -183,6 +194,9 @@ export default function SettlementPage() {
               <div>
                 <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Kỳ thanh toán</p>
                 <h2 className="text-3xl font-black">Tháng {currentSettlement.month}, {currentSettlement.year}</h2>
+                <p className="text-xs font-bold text-slate-400 mt-1">
+                  Thời gian: 01/{currentSettlement.month < 10 ? `0${currentSettlement.month}` : currentSettlement.month} - {getLastDayOfMonth(currentSettlement.year, currentSettlement.month)}/{currentSettlement.month < 10 ? `0${currentSettlement.month}` : currentSettlement.month}
+                </p>
               </div>
               <div className="flex items-center gap-4">
                 {isHead && currentSettlement.status !== 'COMPLETED' && (
@@ -218,7 +232,7 @@ export default function SettlementPage() {
           </div>
           <h3 className="text-2xl font-black text-slate-900">Không có dữ liệu chốt sổ</h3>
           <p className="mt-2 text-slate-500 font-medium max-w-sm text-center">
-            Tháng {selectedMonth}/{selectedYear} chưa thực hiện chốt sổ hoặc không có chi tiêu nào.
+            Kỳ chốt sổ tháng {targetMonth}/{targetYear} chưa thực hiện hoặc không có chi tiêu nào.
           </p>
         </div>
       )}
