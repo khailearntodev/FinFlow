@@ -331,9 +331,9 @@ const ExpenseModal = ({ isOpen, onClose, onSuccess, expense }: any) => {
           </button>
         </div>
 
-        <form onSubmit={handlePreSubmit} className="p-8 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="col-span-2">
+        <form onSubmit={handlePreSubmit} className="p-6 md:p-8 space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+            <div className="sm:col-span-2">
               <label className="block text-sm font-black text-slate-400 uppercase tracking-widest mb-2">Tiêu đề khoản chi</label>
               <input 
                 required
@@ -345,7 +345,7 @@ const ExpenseModal = ({ isOpen, onClose, onSuccess, expense }: any) => {
               />
             </div>
             
-            <div>
+            <div className="flex flex-col">
               <label className="block text-sm font-black text-slate-400 uppercase tracking-widest mb-2">Số tiền (VND)</label>
               <input 
                 required
@@ -354,11 +354,11 @@ const ExpenseModal = ({ isOpen, onClose, onSuccess, expense }: any) => {
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 placeholder="0"
-                className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-black text-xl"
+                className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-black text-xl [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
 
-            <div>
+            <div className="flex flex-col">
               <label className="block text-sm font-black text-slate-400 uppercase tracking-widest mb-2">Ngày chi</label>
               <input 
                 required
