@@ -7,7 +7,9 @@ import { Maintenance } from "@/components/Maintenance";
 
 const inter = Inter({ subsets: ["latin"] });
 
-const MAINTENANCE_MODE = true;
+const MAINTENANCE_MODE = process.env.NEXT_PUBLIC_MAINTENANCE_MODE === 'true';
+const isMaintenance = MAINTENANCE_MODE && process.env.NODE_ENV === 'production';
+
 
 export const metadata: Metadata = {
   title: "FinFlow - Family Finance Simplified",
@@ -26,7 +28,7 @@ export default function RootLayout({
     <html lang="en" className="h-full antialiased">
       <body className={`${inter.className} min-h-full bg-slate-50 text-slate-900`}>
         <ToastProvider>
-          {MAINTENANCE_MODE ? (
+          {isMaintenance ? (
             <Maintenance />
           ) : (
             <AuthProvider>

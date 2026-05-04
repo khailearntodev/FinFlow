@@ -18,6 +18,7 @@ import java.util.UUID;
 public class AuditService {
     private final AuditLogRepository auditLogRepository;
     private final SettlementService settlementService;
+    private final com.finflow.core.family.repository.UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -26,9 +27,13 @@ public class AuditService {
             String oldJson = oldData != null ? objectMapper.writeValueAsString(oldData) : null;
             String newJson = newData != null ? objectMapper.writeValueAsString(newData) : null;
 
+            com.finflow.core.family.domain.User performer = userRepository.findById(userId).orElse(null);
+
             AuditLog auditLog = AuditLog.builder()
                     .familyId(familyId)
                     .userId(userId)
+                    .userFullName(performer != null ? performer.getFullName() : "N/A")
+                    .userEmail(performer != null ? performer.getEmail() : "N/A")
                     .action(action)
                     .entityName("expenses")
                     .entityId(expenseId)
