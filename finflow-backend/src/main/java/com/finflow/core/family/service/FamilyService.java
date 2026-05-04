@@ -15,7 +15,6 @@ import com.finflow.core.settlement.repository.SettlementRepository;
 import com.finflow.core.family.repository.FamilyRepository;
 import com.finflow.core.family.repository.UserRepository;
 import jakarta.transaction.Transactional;
-import jdk.jshell.spi.ExecutionControl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -102,7 +101,7 @@ public class FamilyService {
         Family family = familyRepository.findById(familyId).orElseThrow(() -> new FamilyException("Không tìm thấy gia đình"));
 
         User head = userRepository.findByEmail(adderEmail).orElseThrow(()-> new FamilyException("Không tìm thấy chủ hộ"));
-        if (head.getRole() != RoleEnum.HEAD && family.getMembers().contains(head)) {
+        if (head.getRole() != RoleEnum.HEAD || !family.getMembers().contains(head)) {
             throw new FamilyException("Chỉ chủ hộ mới được thêm thành viên");
         }
 
@@ -154,22 +153,23 @@ public class FamilyService {
         familyRepository.save(family);
         userRepository.saveAll(evictedMembers);
     }
+
     @Transactional
     public FamilyResponse updateFamily(FamilyUpdateRequest updateRequest) {
         Family family = familyRepository.findById(UUID.fromString(updateRequest.getFamilyId()))
                 .orElseThrow(() -> new FamilyException("Không tìm thấy gia đình"));
- 
+
         User head = userRepository.findByEmail(updateRequest.getRequestEmail())
                 .orElseThrow(() -> new FamilyException("Không tìm thấy người dùng thực hiện yêu cầu"));
- 
+
         if (head.getRole() != RoleEnum.HEAD || !family.getMembers().contains(head)) {
             throw new FamilyException("Chỉ chủ hộ mới có quyền thay đổi thiết lập gia đình");
         }
- 
+
         family.setName(updateRequest.getName());
         family.setBillingDate(updateRequest.getBillingDate());
         familyRepository.save(family);
- 
+
         return FamilyResponse.builder()
                 .id(family.getId())
                 .name(family.getName())

@@ -78,7 +78,7 @@ export default function DashboardPage() {
           Bạn chưa tham gia gia đình nào. Hãy tạo mới hoặc yêu cầu chủ hộ thêm bạn vào gia đình để bắt đầu.
         </p>
         <div className="mt-10 flex gap-4">
-          <Link href="/family/create" className="rounded-2xl bg-indigo-600 px-8 py-4 font-bold text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all">
+          <Link href="/family" className="rounded-2xl bg-indigo-600 px-8 py-4 font-bold text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all">
             Tạo gia đình mới
           </Link>
         </div>
