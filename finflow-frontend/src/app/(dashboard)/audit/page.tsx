@@ -50,7 +50,7 @@ export default function AuditPage() {
   return (
     <div className="space-y-10">
       <header>
-        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Lịch sử hoạt động</h1>
+        <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Lịch sử hoạt động</h1>
         <p className="mt-2 text-slate-500 font-medium">Theo dõi mọi thay đổi liên quan đến dữ liệu tài chính.</p>
       </header>
 
@@ -60,15 +60,15 @@ export default function AuditPage() {
             <Activity className="h-5 w-5 text-indigo-600" />
             <h2 className="text-xl font-bold text-slate-900">Nhật ký hệ thống</h2>
           </div>
-          <div className="flex gap-2">
-            <div className="relative">
+          <div className="flex gap-2 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input 
                 type="text" 
                 placeholder="Tìm kiếm..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none text-sm transition-all"
+                className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none text-sm transition-all"
               />
             </div>
           </div>

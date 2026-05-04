@@ -96,14 +96,14 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-10">
-      <header className="flex items-end justify-between">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-black text-slate-900">Chào mừng, {user.fullName.split(' ').pop()}!</h1>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Chào mừng, {user.fullName.split(' ').pop()}!</h1>
           <p className="mt-2 text-slate-500 font-medium">Hôm nay là một ngày tuyệt vời để quản lý tài chính.</p>
         </div>
         <Link
           href="/expenses?action=create"
-          className="flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-4 font-bold text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-6 py-4 font-bold text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 w-full md:w-auto"
         >
           <Plus className="h-5 w-5" />
           Thêm chi tiêu

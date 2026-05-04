@@ -136,18 +136,18 @@ export default function SettlementPage() {
 
   return (
     <div className="space-y-10">
-      <header className="flex items-end justify-between">
+      <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Thanh toán & Công nợ</h1>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Thanh toán & Công nợ</h1>
           <p className="mt-2 text-slate-500 font-medium">Theo dõi và tất toán các khoản chi tiêu định kỳ.</p>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
           <div className="flex bg-white rounded-2xl border border-slate-200 p-1">
             <select 
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-              className="px-4 py-2 bg-transparent font-bold text-slate-600 outline-none"
+              className="flex-1 px-4 py-2 bg-transparent font-bold text-slate-600 outline-none"
             >
               {Array.from({ length: 12 }, (_, i) => (
                 <option key={i + 1} value={i + 1}>Tháng {i + 1}</option>
@@ -156,7 +156,7 @@ export default function SettlementPage() {
             <select 
               value={selectedYear}
               onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="px-4 py-2 bg-transparent font-bold text-slate-600 outline-none border-l border-slate-100"
+              className="flex-1 px-4 py-2 bg-transparent font-bold text-slate-600 outline-none border-l border-slate-100"
             >
               {[2024, 2025, 2026].map(y => (
                 <option key={y} value={y}>{y}</option>
@@ -167,7 +167,7 @@ export default function SettlementPage() {
           {isHead && !currentSettlement && (
             <button 
               onClick={handleCreateSettlement}
-              className="flex items-center gap-2 rounded-2xl bg-slate-900 px-6 py-4 font-bold text-white shadow-xl shadow-slate-200 hover:bg-black transition-all active:scale-95"
+              className="flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-6 py-4 font-bold text-white shadow-xl shadow-slate-200 hover:bg-black transition-all active:scale-95 w-full sm:w-auto"
             >
               <Calendar className="h-5 w-5" />
               Chốt sổ tháng {selectedMonth}

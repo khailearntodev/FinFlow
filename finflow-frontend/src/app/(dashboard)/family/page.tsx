@@ -119,7 +119,7 @@ export default function FamilyPage() {
   return (
     <div className="space-y-10">
       <header>
-        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Quản lý gia đình</h1>
+        <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Quản lý gia đình</h1>
         <p className="mt-2 text-slate-500 font-medium">Quản lý thành viên và thiết lập ngày chốt sổ.</p>
       </header>
 
