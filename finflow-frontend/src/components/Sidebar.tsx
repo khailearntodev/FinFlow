@@ -11,7 +11,9 @@ import {
   LogOut, 
   History,
   TrendingUp,
-  Settings
+  Settings,
+  Menu,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Logo } from './Logo';
@@ -23,6 +25,7 @@ export const Sidebar = () => {
   const pathname = usePathname();
   const { logout, user } = useAuth();
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   const menuItems = [
     { name: 'Tổng quan', icon: LayoutDashboard, href: '/dashboard' },
@@ -33,65 +36,91 @@ export const Sidebar = () => {
   ];
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-72 bg-white border-r border-slate-200 hidden lg:flex flex-col transition-all duration-300 z-50">
-      <div className="p-8">
-        <Link href="/dashboard" className="block">
-          <Logo />
-        </Link>
-      </div>
+    <>
+      {/* Mobile Toggle Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="lg:hidden fixed top-4 left-4 z-[60] p-3 bg-white rounded-2xl shadow-xl shadow-indigo-100 border border-slate-100 text-indigo-600 transition-all active:scale-90"
+      >
+        {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+      </button>
 
-      <nav className="flex-1 px-4 space-y-1 mt-4">
-        {menuItems.map((item) => (
-          <Link
-            key={item.name}
-            href={item.href}
-            className={cn(
-              "flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all duration-200 group",
-              pathname === item.href 
-                ? "bg-indigo-50 text-indigo-600 shadow-sm" 
-                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-            )}
-          >
-            <item.icon className={cn(
-              "h-5 w-5 transition-transform duration-200 group-hover:scale-110",
-              pathname === item.href ? "text-indigo-600" : "text-slate-400"
-            )} />
-            {item.name}
+      {/* Overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden transition-all duration-300"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+      <aside className={cn(
+        "fixed left-0 top-0 h-screen w-72 bg-white border-r border-slate-200 flex flex-col transition-all duration-500 z-50",
+        isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"
+      )}>
+        <div className="p-8">
+          <Link href="/dashboard" className="block" onClick={() => setIsOpen(false)}>
+            <Logo />
           </Link>
-        ))}
-      </nav>
+        </div>
 
-      <div className="p-4 border-t border-slate-100">
-        <Link href="/profile" className="block mb-4 px-4 py-4 bg-slate-50 rounded-2xl hover:bg-indigo-50 transition-colors group">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold uppercase group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-              {user?.fullName?.charAt(0) || 'U'}
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-sm font-bold text-slate-900 truncate">{user?.fullName || 'Người dùng'}</p>
-              <p className="text-xs text-slate-500 truncate">{user?.email}</p>
-            </div>
-          </div>
-        </Link>
-        
-        <button
-          onClick={() => setIsLogoutModalOpen(true)}
-          className="flex w-full items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-semibold text-red-600 hover:bg-red-50 transition-all group"
-        >
-          <LogOut className="h-5 w-5 transition-transform duration-200 group-hover:-translate-x-1" />
-          Đăng xuất
-        </button>
-      </div>
+        <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
+          {menuItems.map((item) => (
+            <Link
+              key={item.name}
+              href={item.href}
+              onClick={() => setIsOpen(false)}
+              className={cn(
+                "flex items-center gap-4 px-4 py-4 rounded-2xl text-sm font-bold transition-all duration-300 group",
+                pathname === item.href
+                  ? "bg-indigo-600 text-white shadow-xl shadow-indigo-200"
+                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+              )}
+            >
+              <item.icon className={cn(
+                "h-5 w-5 transition-transform duration-300 group-hover:scale-110",
+                pathname === item.href ? "text-white" : "text-slate-400 group-hover:text-indigo-600"
+              )} />
+              {item.name}
+            </Link>
+          ))}
+        </nav>
 
-      <ConfirmModal
-        isOpen={isLogoutModalOpen}
-        onClose={() => setIsLogoutModalOpen(false)}
-        onConfirm={logout}
-        title="Đăng xuất"
-        message="Bạn có chắc chắn muốn đăng xuất khỏi hệ thống FinFlow?"
-        type="warning"
-        confirmText="Đăng xuất"
-      />
-    </aside>
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+          <Link 
+            href="/profile" 
+            onClick={() => setIsOpen(false)}
+            className="block mb-4 px-4 py-4 bg-white rounded-2xl border border-slate-100 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-50 transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-black uppercase group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+                {user?.fullName?.charAt(0) || 'U'}
+              </div>
+              <div className="overflow-hidden">
+                <p className="text-sm font-black text-slate-900 truncate">{user?.fullName || 'Người dùng'}</p>
+                <p className="text-[10px] font-bold text-slate-400 truncate uppercase tracking-tight">{user?.role}</p>
+              </div>
+            </div>
+          </Link>
+
+          <button
+            onClick={() => setIsLogoutModalOpen(true)}
+            className="flex w-full items-center gap-4 px-4 py-4 rounded-2xl text-sm font-bold text-red-500 hover:bg-red-50 transition-all group"
+          >
+            <LogOut className="h-5 w-5 transition-transform duration-300 group-hover:-translate-x-1" />
+            Đăng xuất
+          </button>
+        </div>
+
+        <ConfirmModal
+          isOpen={isLogoutModalOpen}
+          onClose={() => setIsLogoutModalOpen(false)}
+          onConfirm={logout}
+          title="Đăng xuất"
+          message="Bạn có chắc chắn muốn đăng xuất khỏi hệ thống FinFlow?"
+          type="warning"
+          confirmText="Đăng xuất"
+        />
+      </aside>
+    </>
   );
 };
