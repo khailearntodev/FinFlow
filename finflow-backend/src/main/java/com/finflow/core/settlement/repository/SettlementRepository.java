@@ -12,5 +12,8 @@ import java.util.UUID;
 public interface SettlementRepository extends JpaRepository<Settlement, UUID> {
     Optional<Settlement> findByFamilyIdAndMonthAndYear(UUID familyId, Integer month, Integer year);
     List<Settlement> findByFamilyId(UUID familyId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
     void deleteByFamilyId(UUID familyId);
 }

@@ -12,5 +12,8 @@ import java.util.UUID;
 public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
     Optional<Expense> findById(UUID expenseId);
     List<Expense> findByFamilyId(UUID familyId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
     void deleteByFamilyId(UUID familyId);
 }
