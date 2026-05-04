@@ -65,13 +65,36 @@ export const auditService = {
 export const getErrorMessage = (error: any) => {
   if (error.response?.data) {
     const data = error.response.data;
+    
+    // Handle string error
     if (typeof data === 'string') return data;
+    
+    // Handle structured error object
     if (data.message) return data.message;
     if (data.error) return data.error;
+    
+    // Handle Spring Boot Validation errors (MethodArgumentNotValidException)
+    if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
+      return data.errors.map((err: any) => err.defaultMessage || err.message).join(', ');
+    }
+    
     if (data.details) return data.details;
-    if (typeof data === 'object') return JSON.stringify(data);
+    
+    // Fallback for object
+    if (typeof data === 'object') {
+      try {
+        return JSON.stringify(data);
+      } catch (e) {
+        return 'Lỗi định dạng dữ liệu từ máy chủ.';
+      }
+    }
   }
-  if (error.message) return error.message;
+  
+  if (error.message) {
+    if (error.message === 'Network Error') return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng.';
+    return error.message;
+  }
+  
   return 'Đã xảy ra lỗi không xác định. Vui lòng thử lại sau.';
 };
 

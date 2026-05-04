@@ -143,6 +143,11 @@ public class FamilyService {
                 if (member.getRole() != RoleEnum.USER || !family.getMembers().contains(member)){
                     throw new FamilyException("Người được xóa không phải là thành viên gia đình");
                 }
+
+                if (expenseRepository.hasPendingExpenses(familyId, member.getId().toString(), member.getId())) {
+                    throw new FamilyException("Không thể xóa " + member.getFullName() + " vì người này vẫn còn khoản chi chưa kết sổ!");
+                }
+
                 member.setFamily(null);
                 family.getMembers().remove(member);
                 evictedMembers.add(member);
