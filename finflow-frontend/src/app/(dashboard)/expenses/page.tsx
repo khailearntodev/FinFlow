@@ -95,9 +95,9 @@ export default function ExpensesPage() {
 
   return (
     <div className="space-y-8">
-      <header className="flex items-end justify-between">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Chi tiêu chung</h1>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Chi tiêu chung</h1>
           <p className="mt-2 text-slate-500 font-medium">Danh sách tất cả các khoản chi tiêu của gia đình.</p>
         </div>
         <button 
@@ -105,16 +105,16 @@ export default function ExpensesPage() {
             setEditingExpense(null);
             setIsModalOpen(true);
           }}
-          className="flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-4 font-bold text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-6 py-4 font-bold text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 w-full md:w-auto"
         >
           <Plus className="h-5 w-5" />
           Thêm khoản chi
         </button>
       </header>
 
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-        <div className="flex gap-4 flex-1 w-full md:w-auto">
-          <div className="relative flex-1 md:w-96">
+      <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
+        <div className="flex flex-col sm:flex-row gap-4 flex-1">
+          <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
             <input 
               type="text" 
@@ -128,11 +128,11 @@ export default function ExpensesPage() {
             type="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="px-6 py-3 rounded-2xl border border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-600"
+            className="w-full sm:w-auto px-6 py-3 rounded-2xl border border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-600"
           />
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
-          <div className="relative flex-1 md:flex-none">
+        <div className="flex gap-2">
+          <div className="relative flex-1 lg:flex-none">
             <select 
               value={sortBy}
               onChange={(e: any) => setSortBy(e.target.value)}
@@ -152,11 +152,11 @@ export default function ExpensesPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Khoản chi</th>
-                <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Người chi</th>
-                <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Ngày chi</th>
-                <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Số tiền</th>
-                <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest text-center">Thao tác</th>
+                <th className="px-4 md:px-8 py-4 md:py-5 text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest">Khoản chi</th>
+                <th className="px-4 md:px-8 py-4 md:py-5 text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest">Người chi</th>
+                <th className="hidden sm:table-cell px-4 md:px-8 py-4 md:py-5 text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest">Ngày chi</th>
+                <th className="px-4 md:px-8 py-4 md:py-5 text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest text-right">Số tiền</th>
+                <th className="px-4 md:px-8 py-4 md:py-5 text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest text-center">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -176,13 +176,13 @@ export default function ExpensesPage() {
               ) : (
                 filteredExpenses.map((expense) => (
                   <tr key={expense.id} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="px-8 py-6">
-                      <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
-                          <Receipt className="h-6 w-6" />
+                    <td className="px-4 md:px-8 py-4 md:py-6">
+                      <div className="flex items-center gap-3 md:gap-4">
+                        <div className="hidden sm:flex h-10 w-10 md:h-12 md:w-12 rounded-2xl bg-slate-100 items-center justify-center text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                          <Receipt className="h-5 w-5 md:h-6 md:w-6" />
                         </div>
                         <div>
-                          <p className="font-bold text-slate-900 text-lg">{expense.title}</p>
+                          <p className="font-bold text-slate-900 text-sm md:text-lg">{expense.title}</p>
                           <div className="flex items-center gap-2 mt-1">
                             {expense.status === 'SETTLED' && (
                               <span className="text-[10px] px-2 py-0.5 bg-slate-900 text-white rounded-md font-black uppercase tracking-tighter flex items-center gap-1">
@@ -201,21 +201,21 @@ export default function ExpensesPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-8 py-6">
+                    <td className="px-4 md:px-8 py-4 md:py-6">
                       <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-full bg-indigo-50 flex items-center justify-center text-[10px] font-black text-indigo-600 ring-2 ring-white">
+                        <div className="h-6 w-6 md:h-8 md:w-8 rounded-full bg-indigo-50 flex items-center justify-center text-[8px] md:text-[10px] font-black text-indigo-600 ring-2 ring-white">
                           {expense.paidByEmail.charAt(0).toUpperCase()}
                         </div>
-                        <span className="text-sm font-bold text-slate-700">{expense.paidByEmail}</span>
+                        <span className="text-[10px] md:text-sm font-bold text-slate-700 truncate max-w-[60px] md:max-w-none">{expense.paidByEmail}</span>
                       </div>
                     </td>
-                    <td className="px-8 py-6">
-                      <span className="text-sm font-bold text-slate-500">{formatDate(expense.expenseDate)}</span>
+                    <td className="hidden sm:table-cell px-4 md:px-8 py-4 md:py-6">
+                      <span className="text-[10px] md:text-sm font-bold text-slate-500">{formatDate(expense.expenseDate)}</span>
                     </td>
-                    <td className="px-8 py-6 text-right">
-                      <span className="text-xl font-black text-slate-900 tracking-tight">{formatCurrency(expense.amount)}</span>
+                    <td className="px-4 md:px-8 py-4 md:py-6 text-right">
+                      <span className="text-sm md:text-xl font-black text-slate-900 tracking-tight">{formatCurrency(expense.amount)}</span>
                     </td>
-                    <td className="px-8 py-6">
+                    <td className="px-4 md:px-8 py-4 md:py-6">
                       <div className="flex items-center justify-center gap-2">
                         {expense.status === 'PENDING' && (user?.email === expense.paidByEmail || user?.role === 'HEAD') ? (
                           <>
