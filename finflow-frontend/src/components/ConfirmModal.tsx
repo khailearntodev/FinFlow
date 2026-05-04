@@ -1,7 +1,8 @@
 'use client';
 
-import { X, AlertCircle, HelpCircle, CheckCircle2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Fragment } from 'react';
+import { Dialog, Transition } from '@headlessui/react';
+import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -9,103 +10,87 @@ interface ConfirmModalProps {
   onConfirm: () => void;
   title: string;
   message: string;
-  type?: 'warning' | 'info' | 'success' | 'danger';
   confirmText?: string;
-  cancelText?: string;
+  type?: 'danger' | 'warning' | 'info';
+  isLoading?: boolean;
 }
 
-export const ConfirmModal = ({
+export function ConfirmModal({
   isOpen,
   onClose,
   onConfirm,
   title,
   message,
-  type = 'info',
   confirmText = 'Xác nhận',
-  cancelText = 'Hủy'
-}: ConfirmModalProps) => {
-  if (!isOpen) return null;
-
-  const typeConfig = {
-    warning: {
-      icon: AlertCircle,
-      iconColor: 'text-amber-600',
-      iconBg: 'bg-amber-100',
-      btnBg: 'bg-amber-600 hover:bg-amber-700 shadow-amber-100',
-    },
-    danger: {
-      icon: AlertCircle,
-      iconColor: 'text-rose-600',
-      iconBg: 'bg-rose-100',
-      btnBg: 'bg-rose-600 hover:bg-rose-700 shadow-rose-100',
-    },
-    success: {
-      icon: CheckCircle2,
-      iconColor: 'text-emerald-600',
-      iconBg: 'bg-emerald-100',
-      btnBg: 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100',
-    },
-    info: {
-      icon: HelpCircle,
-      iconColor: 'text-indigo-600',
-      iconBg: 'bg-indigo-100',
-      btnBg: 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100',
-    }
-  };
-
-  const config = typeConfig[type];
-  const Icon = config.icon;
+  type = 'danger',
+  isLoading = false
+}: ConfirmModalProps) {
+  const buttonColor = type === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700';
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
-      <div 
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
-      
-      <div className="relative w-full max-w-md transform overflow-hidden rounded-[2.5rem] bg-white p-8 shadow-2xl transition-all animate-in fade-in zoom-in duration-300">
-        <button 
-          onClick={onClose}
-          className="absolute right-6 top-6 p-2 rounded-xl text-slate-400 hover:bg-slate-100 transition-colors"
+    <Transition.Root show={isOpen} as={Fragment}>
+      <Dialog as="div" className="relative z-50" onClose={onClose}>
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
         >
-          <X className="h-5 w-5" />
-        </button>
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+        </Transition.Child>
 
-        <div className="flex flex-col items-center text-center">
-          <div className={cn("mb-6 h-20 w-20 rounded-3xl flex items-center justify-center", config.iconBg, config.iconColor)}>
-            <Icon className="h-10 w-10" />
-          </div>
-
-          <h3 className="text-2xl font-black text-slate-900 leading-tight">
-            {title}
-          </h3>
-          
-          <p className="mt-4 text-slate-600 font-medium leading-relaxed">
-            {message}
-          </p>
-
-          <div className="mt-10 flex w-full gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 px-6 py-4 rounded-2xl bg-slate-100 font-bold text-slate-600 hover:bg-slate-200 transition-all active:scale-95"
+        <div className="fixed inset-0 z-10 overflow-y-auto">
+          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+              enterTo="opacity-100 translate-y-0 sm:scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 translate-y-0 sm:scale-100"
+              leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             >
-              {cancelText}
-            </button>
-            <button
-              onClick={() => {
-                onConfirm();
-                onClose();
-              }}
-              className={cn(
-                "flex-[1.5] px-6 py-4 rounded-2xl font-bold text-white shadow-xl transition-all active:scale-95",
-                config.btnBg
-              )}
-            >
-              {confirmText}
-            </button>
+              <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
+                <div className="sm:flex sm:items-start">
+                  <div className={`mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full ${type === 'danger' ? 'bg-red-100' : 'bg-blue-100'} sm:mx-0 sm:h-10 sm:w-10`}>
+                    <ExclamationTriangleIcon className={`h-6 w-6 ${type === 'danger' ? 'text-red-600' : 'text-blue-600'}`} aria-hidden="true" />
+                  </div>
+                  <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                    <Dialog.Title as="h3" className="text-base font-semibold leading-6 text-gray-900">
+                      {title}
+                    </Dialog.Title>
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500">
+                        {message}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    className={`inline-flex w-full justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm sm:ml-3 sm:w-auto ${buttonColor} disabled:opacity-50`}
+                    onClick={onConfirm}
+                  >
+                    {isLoading ? 'Đang xử lý...' : confirmText}
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
+                    onClick={onClose}
+                  >
+                    Hủy
+                  </button>
+                </div>
+              </Dialog.Panel>
+            </Transition.Child>
           </div>
         </div>
-      </div>
-    </div>
+      </Dialog>
+    </Transition.Root>
   );
-};
+}

@@ -33,17 +33,9 @@ export default function ExpensesPage() {
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'amount'>('newest');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
   
-  const [confirmModal, setConfirmModal] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
-  }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    onConfirm: () => {}
-  });
+  // Confirmation states
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string } | null>(null);
+  const [confirmEdit, setConfirmEdit] = useState<{ formData: any } | null>(null);
 
   const fetchExpenses = async () => {
     if (!user?.family?.id) {
@@ -71,21 +63,19 @@ export default function ExpensesPage() {
     }
   }, [searchParams, router]);
 
-  const handleDelete = async (id: string) => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Xóa khoản chi',
-      message: 'Bạn có chắc chắn muốn xóa khoản chi này? Hành động này không thể hoàn tác.',
-      onConfirm: async () => {
-        try {
-          await expenseService.delete(user.family.id, id, user.id);
-          setExpenses(expenses.filter(e => e.id !== id));
-          showToast('Đã xóa khoản chi thành công!', 'success');
-        } catch (error: any) {
-          showToast(getErrorMessage(error), 'error');
-        }
-      }
-    });
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    setLoading(true);
+    try {
+      await expenseService.delete(user.family.id, confirmDelete.id, user.id);
+      setExpenses(expenses.filter(e => e.id !== confirmDelete.id));
+      showToast('Đã xóa khoản chi thành công!', 'success');
+      setConfirmDelete(null);
+    } catch (error: any) {
+      showToast(getErrorMessage(error), 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredExpenses = expenses
@@ -239,7 +229,7 @@ export default function ExpensesPage() {
                               <Edit3 className="h-5 w-5" />
                             </button>
                             <button 
-                              onClick={() => handleDelete(expense.id)}
+                              onClick={() => setConfirmDelete({ id: expense.id })}
                               className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
                             >
                               <Trash2 className="h-5 w-5" />
@@ -273,12 +263,13 @@ export default function ExpensesPage() {
       )}
 
       <ConfirmModal
-        isOpen={confirmModal.isOpen}
-        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-        onConfirm={confirmModal.onConfirm}
-        title={confirmModal.title}
-        message={confirmModal.message}
-        type="danger"
+        isOpen={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={handleDelete}
+        title="Xóa khoản chi?"
+        message="Bạn có chắc chắn muốn xóa khoản chi này khỏi hệ thống? Dữ liệu thanh toán liên quan sẽ bị ảnh hưởng."
+        confirmText="Xóa ngay"
+        isLoading={loading}
       />
     </div>
   );
@@ -288,6 +279,7 @@ const ExpenseModal = ({ isOpen, onClose, onSuccess, expense }: any) => {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [formData, setFormData] = useState({
     title: expense?.title || '',
     amount: expense?.amount || '',
@@ -298,8 +290,13 @@ const ExpenseModal = ({ isOpen, onClose, onSuccess, expense }: any) => {
       user.family?.members?.map((m: any) => m.id) || [],
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handlePreSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setShowConfirm(true);
+  };
+
+  const handleSubmit = async () => {
+    setShowConfirm(false);
     setLoading(true);
     try {
       if (expense) {
@@ -334,7 +331,7 @@ const ExpenseModal = ({ isOpen, onClose, onSuccess, expense }: any) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+        <form onSubmit={handlePreSubmit} className="p-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="col-span-2">
               <label className="block text-sm font-black text-slate-400 uppercase tracking-widest mb-2">Tiêu đề khoản chi</label>
@@ -419,6 +416,17 @@ const ExpenseModal = ({ isOpen, onClose, onSuccess, expense }: any) => {
           </div>
         </form>
       </div>
+
+      <ConfirmModal
+        isOpen={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        onConfirm={handleSubmit}
+        title={expense ? 'Cập nhật khoản chi?' : 'Tạo khoản chi mới?'}
+        message={expense ? 'Bạn có chắc muốn lưu các thay đổi cho khoản chi này?' : 'Hệ thống sẽ ghi nhận khoản chi mới và chia đều cho các thành viên được chọn.'}
+        confirmText="Xác nhận"
+        type="info"
+        isLoading={loading}
+      />
     </div>
   );
 }
