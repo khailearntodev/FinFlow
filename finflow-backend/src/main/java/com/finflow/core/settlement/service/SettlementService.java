@@ -236,7 +236,9 @@ public class SettlementService {
         }
 
         if (bill.getStatus() == SettlementBillStatusEnum.PENDING && bill.getAmount().compareTo(BigDecimal.ZERO) >= 0) {
-            throw new SettlementException("Hóa đơn này chưa được nộp minh chứng thanh toán");
+            if (!bill.getUserId().equals(head.getId())) {
+                throw new SettlementException("Hóa đơn này chưa được nộp minh chứng thanh toán");
+            }
         }
 
         bill.setStatus(SettlementBillStatusEnum.COMPLETED);
