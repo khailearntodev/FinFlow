@@ -6,6 +6,7 @@ import com.finflow.core.family.dto.UserProfileResponse;
 import com.finflow.core.family.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.stream.Collectors;
@@ -17,6 +18,7 @@ public class UserController {
     private final UserRepository userRepository;
 
     @GetMapping("/me")
+    @Transactional(readOnly = true)
     public ResponseEntity<UserProfileResponse> getProfile(@RequestParam("email") String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new FamilyException("Không tìm thấy người dùng"));
