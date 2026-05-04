@@ -44,8 +44,40 @@ export default function AuditPage() {
   const filteredLogs = logs.filter(log => 
     log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
     log.entityName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    log.userId.toLowerCase().includes(searchQuery.toLowerCase())
+    (log.userFullName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (log.userEmail || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const renderValues = (jsonStr: string) => {
+    if (!jsonStr) return null;
+    try {
+      const data = JSON.parse(jsonStr);
+      return (
+        <div className="space-y-1 mt-1">
+          {Object.entries(data).map(([key, value]: [string, any]) => {
+            // Format labels for common keys
+            const labelMap: Record<string, string> = {
+              title: 'Tiêu đề',
+              amount: 'Số tiền',
+              expenseDate: 'Ngày chi',
+              paidByEmail: 'Người trả',
+              participantIDs: 'Người hưởng lợi'
+            };
+            const label = labelMap[key] || key;
+            
+            return (
+              <div key={key} className="flex items-start gap-2 text-[11px]">
+                <span className="font-black text-slate-400 min-w-[80px]">{label}:</span>
+                <span className="font-bold break-all">{Array.isArray(value) ? `${value.length} người` : value}</span>
+              </div>
+            );
+          })}
+        </div>
+      );
+    } catch (e) {
+      return <pre className="text-[10px] opacity-50">{jsonStr}</pre>;
+    }
+  };
 
   return (
     <div className="space-y-10">
@@ -114,31 +146,34 @@ export default function AuditPage() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-3 text-sm text-slate-600">
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-lg">
-                      <User className="h-3.5 w-3.5" />
-                      <span className="font-bold">{log.userId}</span>
+                    <div className="flex items-center gap-3 text-sm text-slate-600">
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-slate-100 rounded-lg shadow-sm">
+                        <User className="h-3.5 w-3.5 text-indigo-500" />
+                        <span className="font-bold text-slate-900">{log.userFullName}</span>
+                        <span className="text-[10px] text-slate-400 font-medium">({log.userEmail})</span>
+                      </div>
                     </div>
-                    <ArrowRight className="h-4 w-4 text-slate-300" />
-                    <span className="font-medium text-slate-500 italic truncate max-w-md">
-                      ID: {log.entityId}
-                    </span>
-                  </div>
 
-                  {log.action === 'UPDATE' && (
+                  {(log.oldValues || log.newValues) && (
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Giá trị cũ</p>
-                        <pre className="text-xs font-mono text-slate-500 overflow-x-auto whitespace-pre-wrap">
-                          {log.oldValues || 'N/A'}
-                        </pre>
-                      </div>
-                      <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-100">
-                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Giá trị mới</p>
-                        <pre className="text-xs font-mono text-indigo-600 overflow-x-auto whitespace-pre-wrap">
-                          {log.newValues || 'N/A'}
-                        </pre>
-                      </div>
+                      {log.oldValues && (
+                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                            {log.action === 'CREATE' ? 'Thông tin ban đầu' : 
+                             log.action === 'DELETE' ? 'Dữ liệu trước khi xóa' : 
+                             'Giá trị cũ'}
+                          </p>
+                          {renderValues(log.oldValues)}
+                        </div>
+                      )}
+                      {log.newValues && (
+                        <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-100">
+                          <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">
+                            {log.action === 'CREATE' ? 'Dữ liệu đã tạo' : 'Giá trị mới'}
+                          </p>
+                          {renderValues(log.newValues)}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

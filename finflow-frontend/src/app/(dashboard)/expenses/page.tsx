@@ -368,6 +368,24 @@ const ExpenseModal = ({ isOpen, onClose, onSuccess, expense }: any) => {
                 className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-bold"
               />
             </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-black text-slate-400 uppercase tracking-widest mb-2">Ai đã trả tiền?</label>
+              <div className="relative">
+                <select
+                  value={formData.paidByEmail}
+                  onChange={(e) => setFormData({ ...formData, paidByEmail: e.target.value })}
+                  className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-bold text-slate-700 appearance-none bg-white"
+                >
+                  {user.family?.members?.map((member: any) => (
+                    <option key={member.id} value={member.email}>
+                      {member.fullName} ({member.email})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
           </div>
 
           <div>

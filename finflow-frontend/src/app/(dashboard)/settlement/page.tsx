@@ -239,7 +239,9 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
   const isMyBill = bill.userEmail === user.email;
-  
+  const isDebtor = bill.amount > 0; // Member owes money to Head
+  const isCreditor = bill.amount < 0; // Head owes money to Member
+
   const handleUploadProof = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -272,10 +274,25 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
   const config = statusConfig[bill.status as keyof typeof statusConfig];
 
   return (
-    <div className="relative p-6 rounded-[2rem] border border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 transition-all group">
-      <div className="flex items-center justify-between mb-4">
-        <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center font-bold text-slate-900 shadow-sm">
-          {bill.fullName.charAt(0)}
+    <div className={cn(
+      "relative p-8 rounded-[2.5rem] border transition-all duration-300",
+      isMyBill ? "bg-white border-indigo-100 shadow-xl shadow-indigo-100/50 ring-2 ring-indigo-500/10" : "bg-slate-50/50 border-slate-100 hover:bg-white hover:shadow-xl hover:shadow-slate-200/50"
+    )}>
+      {isMyBill && (
+        <div className="absolute -top-3 left-8 px-4 py-1 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg">
+          Hóa đơn của bạn
+        </div>
+      )}
+
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="h-12 w-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center font-black text-slate-900 shadow-sm text-xl">
+            {bill.fullName.charAt(0)}
+          </div>
+          <div>
+            <h4 className="font-bold text-slate-900 leading-none">{bill.fullName}</h4>
+            <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-wider">{isHead && bill.userEmail === user.email ? 'Chủ hộ' : 'Thành viên'}</p>
+          </div>
         </div>
         <div className={cn("flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest", config.bg, config.color)}>
           <config.icon className="h-3.5 w-3.5" />
@@ -283,58 +300,110 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
         </div>
       </div>
 
-      <h4 className="font-bold text-slate-900">{bill.fullName}</h4>
-      <p className="text-xs text-slate-500 mb-4">{bill.userEmail}</p>
-
-      <div className="mb-6">
-        <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Số tiền</p>
+      <div className="p-6 rounded-3xl bg-white border border-slate-100 mb-6">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Số tiền tất toán</p>
+        <div className="flex items-baseline gap-1">
+          <p className={cn(
+            "text-3xl font-black tracking-tighter",
+            isDebtor ? "text-rose-600" : "text-emerald-600"
+          )}>
+            {isDebtor ? '+' : ''}{formatCurrency(bill.amount)}
+          </p>
+        </div>
         <p className={cn(
-          "text-2xl font-black tracking-tight",
-          bill.amount > 0 ? "text-rose-600" : "text-emerald-600"
+          "text-[10px] font-bold mt-2 flex items-center gap-1.5",
+          isDebtor ? "text-rose-500" : "text-emerald-500"
         )}>
-          {bill.amount > 0 ? '+' : ''}{formatCurrency(bill.amount)}
-        </p>
-        <p className="text-[10px] font-bold text-slate-400 mt-1">
-          {bill.amount > 0 ? 'Cần đóng về quỹ' : 'Nhận lại từ quỹ'}
+          {isDebtor ? (
+            <><ExternalLink className="h-3 w-3" /> Cần đóng về quỹ (cho Chủ hộ)</>
+          ) : (
+            <><CheckCircle2 className="h-3 w-3" /> Nhận lại từ quỹ (từ Chủ hộ)</>
+          )}
         </p>
       </div>
 
       <div className="space-y-3">
+        {/* Xem minh chứng (Dành cho tất cả nếu đã có) */}
         {bill.proofImageUrl && (
           <a 
             href={bill.proofImageUrl} 
             target="_blank" 
             rel="noreferrer"
-            className="flex items-center justify-center gap-2 w-full py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all"
+            className="flex items-center justify-center gap-2 w-full py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all"
           >
             <ImageIcon className="h-4 w-4" />
             Xem minh chứng
           </a>
         )}
 
-        {isMyBill && bill.status === 'PENDING' && bill.amount > 0 && (
-          <label className="flex items-center justify-center gap-2 w-full py-3 bg-indigo-600 rounded-xl text-xs font-bold text-white shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all cursor-pointer">
-            <Upload className="h-4 w-4" />
-            {uploading ? 'Đang tải...' : 'Nộp minh chứng'}
-            <input type="file" className="hidden" onChange={handleUploadProof} disabled={uploading} />
-          </label>
+        {/* Nộp minh chứng (Dành cho Thành viên nợ tiền - Không phải Chủ hộ) */}
+        {isMyBill && !isHead && isDebtor && bill.status === 'PENDING' && (
+          <div className="space-y-3">
+            <p className="text-[10px] text-slate-400 font-bold text-center bg-slate-100 py-2 rounded-xl">
+              Vui lòng chuyển {formatCurrency(bill.amount)} cho Chủ hộ và tải biên lai.
+            </p>
+            <label className="flex items-center justify-center gap-2 w-full py-4 bg-indigo-600 rounded-2xl text-xs font-black text-white shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all cursor-pointer">
+              <Upload className="h-4 w-4" />
+              {uploading ? 'Đang tải...' : 'Nộp minh chứng thanh toán'}
+              <input type="file" className="hidden" onChange={handleUploadProof} disabled={uploading} />
+            </label>
+          </div>
         )}
 
-        {(isHead && (
-          (bill.status === 'WAITING_FOR_CONFIRMATION') || 
-          (bill.status === 'PENDING' && bill.amount < 0)
-        )) && (
-          <button 
-            onClick={handleConfirm}
-            className="flex items-center justify-center gap-2 w-full py-3 bg-emerald-600 rounded-xl text-xs font-bold text-white shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all"
-          >
-            <Check className="h-4 w-4" />
-            {bill.amount < 0 ? 'Xác nhận đã trả tiền' : 'Xác nhận nhận tiền'}
-          </button>
+        {/* Chế độ hiển thị cho Thành viên được nhận tiền (Creditor) */}
+        {isMyBill && isCreditor && bill.status === 'PENDING' && (
+          <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+            <p className="text-[10px] text-emerald-700 font-bold text-center italic">
+              Bạn sẽ nhận lại {formatCurrency(Math.abs(bill.amount))} từ Chủ hộ. Vui lòng đợi xác nhận.
+            </p>
+          </div>
+        )}
+
+        {/* CÁC THAO TÁC CỦA CHỦ HỘ (HEAD) */}
+        {isHead && bill.status !== 'COMPLETED' && (
+          <div className="pt-2">
+            {/* 1. Duyệt minh chứng của thành viên khác đóng tiền */}
+            {!isMyBill && isDebtor && bill.status === 'WAITING_FOR_CONFIRMATION' && (
+              <button 
+                onClick={handleConfirm}
+                className="flex items-center justify-center gap-2 w-full py-4 bg-emerald-600 rounded-2xl text-xs font-black text-white shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all"
+              >
+                <Check className="h-4 w-4" />
+                Xác nhận đã nhận tiền
+              </button>
+            )}
+
+            {/* 2. Chủ hộ tự xác nhận nợ của chính mình (Vì A thu tiền của chính A) */}
+            {isMyBill && isDebtor && bill.status === 'PENDING' && (
+              <button 
+                onClick={handleConfirm}
+                className="flex items-center justify-center gap-2 w-full py-4 bg-slate-900 rounded-2xl text-xs font-black text-white shadow-xl shadow-slate-200 hover:bg-black transition-all"
+              >
+                <Check className="h-4 w-4" />
+                Xác nhận đã nộp vào quỹ
+              </button>
+            )}
+
+            {/* 3. Chủ hộ xác nhận đã trả tiền cho thành viên chi lố (Creditor) */}
+            {isCreditor && bill.status === 'PENDING' && (
+              <button 
+                onClick={handleConfirm}
+                className="flex items-center justify-center gap-2 w-full py-4 bg-indigo-600 rounded-2xl text-xs font-black text-white shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
+              >
+                <Check className="h-4 w-4" />
+                Xác nhận đã trả tiền cho {bill.fullName.split(' ').pop()}
+              </button>
+            )}
+            
+            {/* Cảnh báo nếu chưa có minh chứng nhưng ông A muốn duyệt sớm (Optionally) */}
+            {!isMyBill && isDebtor && bill.status === 'PENDING' && (
+              <p className="text-[10px] text-slate-400 font-bold text-center mt-2 italic">
+                Chờ {bill.fullName.split(' ').pop()} nộp minh chứng...
+              </p>
+            )}
+          </div>
         )}
       </div>
-      
-      {isMyBill && <div className="absolute top-2 right-2 h-2 w-2 bg-indigo-600 rounded-full animate-pulse"></div>}
     </div>
   );
 }
