@@ -81,12 +81,14 @@ public class FamilyService {
 
         expenseRepository.deleteByFamilyId(familyId);
 
-        List<User> users = familyToDelete.getMembers();
+        List<User> users = new java.util.ArrayList<>(familyToDelete.getMembers());
         for (User user: users) {
             user.setRole(RoleEnum.USER);
             user.setFamily(null);
         }
         userRepository.saveAll(users);
+        familyToDelete.getMembers().clear();
+        familyRepository.save(familyToDelete);
 
         familyRepository.delete(familyToDelete);
     }

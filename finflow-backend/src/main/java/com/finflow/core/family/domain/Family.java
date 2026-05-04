@@ -30,6 +30,6 @@ public class Family {
     @Column(name = "created_at", updatable = false)
     private ZonedDateTime createdAt;
 
-    @OneToMany(mappedBy = "family", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "family", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.LAZY)
     private List<User> members;
 }

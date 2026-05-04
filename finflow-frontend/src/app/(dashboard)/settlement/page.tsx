@@ -41,7 +41,10 @@ export default function SettlementPage() {
   });
 
   const fetchSettlements = async () => {
-    if (!user?.family?.id) return;
+    if (!user?.family?.id) {
+      setLoading(false);
+      return;
+    }
     try {
       const response = await settlementService.getSettlements(user.family.id);
       setSettlements(response.data);
@@ -107,6 +110,26 @@ export default function SettlementPage() {
     return (
       <div className="flex h-96 items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  if (!user?.family) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[3rem] border border-dashed border-slate-200">
+        <div className="h-20 w-20 rounded-3xl bg-amber-100 flex items-center justify-center text-amber-600 mb-6">
+          <AlertCircle className="h-10 w-10" />
+        </div>
+        <h3 className="text-2xl font-black text-slate-900">Bạn chưa có gia đình</h3>
+        <p className="mt-2 text-slate-500 font-medium max-w-sm text-center">
+          Vui lòng tạo gia đình mới hoặc tham gia một gia đình để sử dụng tính năng chốt sổ và thanh toán.
+        </p>
+        <a 
+          href="/family"
+          className="mt-8 flex items-center gap-2 rounded-2xl bg-slate-900 px-8 py-4 font-bold text-white shadow-xl shadow-slate-200 hover:bg-black transition-all active:scale-95"
+        >
+          Đến trang Gia đình
+        </a>
       </div>
     );
   }

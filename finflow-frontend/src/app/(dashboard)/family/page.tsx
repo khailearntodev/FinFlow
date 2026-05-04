@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/contexts/ToastContext';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 export default function FamilyPage() {
   const { user, refreshUser } = useAuth();
@@ -30,6 +31,10 @@ export default function FamilyPage() {
     name: user?.family?.name || '',
     billingDate: user?.family?.billingDate || 25
   });
+
+  const [confirmDisband, setConfirmDisband] = useState(false);
+  const [confirmRemoveMember, setConfirmRemoveMember] = useState<{ email: string } | null>(null);
+  const [confirmUpdateSettings, setConfirmUpdateSettings] = useState(false);
 
   const handleAddMembers = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,23 +56,40 @@ export default function FamilyPage() {
     }
   };
 
-  const handleRemoveMember = async (email: string) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa ${email} khỏi gia đình?`)) return;
+  const handleRemoveMember = async () => {
+    if (!confirmRemoveMember) return;
+    setLoading(true);
     try {
       await familyService.revokeMember({
         familyId: user.family.id,
-        userEmail: [email],
+        userEmail: [confirmRemoveMember.email],
         adderEmail: user.email
       });
       showToast('Đã xóa thành viên thành công!', 'success');
+      setConfirmRemoveMember(null);
       refreshUser();
     } catch (error: any) {
       showToast(getErrorMessage(error), 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleUpdateSettings = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleDisbandFamily = async () => {
+    setLoading(true);
+    try {
+      await familyService.delete(user.family.id, user.email);
+      showToast('Đã giải tán gia đình thành công!', 'success');
+      setConfirmDisband(false);
+      refreshUser();
+    } catch (error: any) {
+      showToast(getErrorMessage(error), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateSettings = async () => {
     setLoading(true);
     try {
       await familyService.update({
@@ -77,6 +99,7 @@ export default function FamilyPage() {
         requestEmail: user.email
       });
       showToast('Cập nhật thiết lập thành công!', 'success');
+      setConfirmUpdateSettings(false);
       setIsSettingsModalOpen(false);
       refreshUser();
     } catch (error: any) {
@@ -129,7 +152,7 @@ export default function FamilyPage() {
                   </div>
                   {isHead && member.email !== user.email && (
                     <button 
-                      onClick={() => handleRemoveMember(member.email)}
+                      onClick={() => setConfirmRemoveMember({ email: member.email })}
                       className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
                     >
                       <UserMinus className="h-5 w-5" />
@@ -220,12 +243,7 @@ export default function FamilyPage() {
 
               {isHead && (
                 <button 
-                  onClick={async () => {
-                    if (window.confirm('Bạn có thực sự muốn GIẢI TÁN gia đình này? Dữ liệu sẽ mất hết!')) {
-                      await familyService.delete(user.family.id, user.email);
-                      refreshUser();
-                    }
-                  }}
+                  onClick={() => setConfirmDisband(true)}
                   className="w-full mt-10 flex items-center justify-center gap-2 text-rose-500 font-bold hover:bg-rose-500/10 py-3 rounded-xl transition-all"
                 >
                   <Trash2 className="h-5 w-5" />
@@ -246,7 +264,10 @@ export default function FamilyPage() {
               </button>
             </div>
  
-            <form onSubmit={handleUpdateSettings} className="p-8 space-y-6">
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              setConfirmUpdateSettings(true);
+            }} className="p-8 space-y-6">
               <div>
                 <label className="block text-sm font-black text-slate-400 uppercase tracking-widest mb-2">Tên gia đình</label>
                 <input 
@@ -299,6 +320,37 @@ export default function FamilyPage() {
           </div>
         </div>
       )}
+      {/* Các Modal xác nhận */}
+      <ConfirmModal
+        isOpen={confirmDisband}
+        onClose={() => setConfirmDisband(false)}
+        onConfirm={handleDisbandFamily}
+        title="Giải tán gia đình?"
+        message="Hành động này sẽ xóa toàn bộ dữ liệu chi tiêu, thanh toán và lịch sử của gia đình. Bạn không thể hoàn tác!"
+        confirmText="Giải tán ngay"
+        isLoading={loading}
+      />
+
+      <ConfirmModal
+        isOpen={!!confirmRemoveMember}
+        onClose={() => setConfirmRemoveMember(null)}
+        onConfirm={handleRemoveMember}
+        title="Xóa thành viên?"
+        message={`Bạn có chắc chắn muốn mời ${confirmRemoveMember?.email} rời khỏi gia đình?`}
+        confirmText="Xóa thành viên"
+        isLoading={loading}
+      />
+
+      <ConfirmModal
+        isOpen={confirmUpdateSettings}
+        onClose={() => setConfirmUpdateSettings(false)}
+        onConfirm={handleUpdateSettings}
+        title="Lưu thiết lập?"
+        message="Bạn có chắc chắn muốn cập nhật tên gia đình và ngày chốt sổ mới?"
+        confirmText="Lưu thay đổi"
+        type="info"
+        isLoading={loading}
+      />
     </div>
   );
 }
