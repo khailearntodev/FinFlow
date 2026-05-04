@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { expenseService, getErrorMessage } from '@/services/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { 
-  Receipt, 
-  Plus, 
-  Search, 
-  Trash2, 
+import {
+  Receipt,
+  Plus,
+  Search,
+  Trash2,
   Edit3,
   ChevronDown,
   X,
@@ -32,7 +32,7 @@ export default function ExpensesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'amount'>('newest');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
-  
+
   // Confirmation states
   const [confirmDelete, setConfirmDelete] = useState<{ id: string } | null>(null);
   const [confirmEdit, setConfirmEdit] = useState<{ formData: any } | null>(null);
@@ -83,7 +83,7 @@ export default function ExpensesPage() {
       const expenseMonth = e.expenseDate.slice(0, 7);
       const matchesMonth = !selectedMonth || expenseMonth === selectedMonth;
       const matchesSearch = e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           e.paidByEmail.toLowerCase().includes(searchQuery.toLowerCase());
+        e.paidByEmail.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesMonth && matchesSearch;
     })
     .sort((a, b) => {
@@ -100,7 +100,7 @@ export default function ExpensesPage() {
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Chi tiêu chung</h1>
           <p className="mt-2 text-slate-500 font-medium">Danh sách tất cả các khoản chi tiêu của gia đình.</p>
         </div>
-        <button 
+        <button
           onClick={() => {
             setEditingExpense(null);
             setIsModalOpen(true);
@@ -116,15 +116,15 @@ export default function ExpensesPage() {
         <div className="flex flex-col sm:flex-row gap-4 flex-1">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Tìm kiếm chi tiêu..." 
+            <input
+              type="text"
+              placeholder="Tìm kiếm chi tiêu..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all"
             />
           </div>
-          <input 
+          <input
             type="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
@@ -133,7 +133,7 @@ export default function ExpensesPage() {
         </div>
         <div className="flex gap-2">
           <div className="relative flex-1 lg:flex-none">
-            <select 
+            <select
               value={sortBy}
               onChange={(e: any) => setSortBy(e.target.value)}
               className="w-full appearance-none flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-white border border-slate-200 font-bold text-slate-600 hover:bg-slate-50 transition-colors outline-none pr-10"
@@ -219,7 +219,7 @@ export default function ExpensesPage() {
                       <div className="flex items-center justify-center gap-2">
                         {expense.status === 'PENDING' && (user?.email === expense.paidByEmail || user?.role === 'HEAD') ? (
                           <>
-                            <button 
+                            <button
                               onClick={() => {
                                 setEditingExpense(expense);
                                 setIsModalOpen(true);
@@ -228,7 +228,7 @@ export default function ExpensesPage() {
                             >
                               <Edit3 className="h-5 w-5" />
                             </button>
-                            <button 
+                            <button
                               onClick={() => setConfirmDelete({ id: expense.id })}
                               className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
                             >
@@ -251,9 +251,9 @@ export default function ExpensesPage() {
       </div>
 
       {isModalOpen && (
-        <ExpenseModal 
-          isOpen={isModalOpen} 
-          onClose={() => setIsModalOpen(false)} 
+        <ExpenseModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
           onSuccess={() => {
             setIsModalOpen(false);
             fetchExpenses();
@@ -285,8 +285,8 @@ const ExpenseModal = ({ isOpen, onClose, onSuccess, expense }: any) => {
     amount: expense?.amount || '',
     expenseDate: expense?.expenseDate || new Date().toISOString().split('T')[0],
     paidByEmail: expense?.paidByEmail || user.email,
-    participantIDs: expense?.participants ? 
-      user.family?.members?.filter((m: any) => expense.participants.includes(m.email)).map((m: any) => m.id) || [] : 
+    participantIDs: expense?.participants ?
+      user.family?.members?.filter((m: any) => expense.participants.includes(m.email)).map((m: any) => m.id) || [] :
       user.family?.members?.map((m: any) => m.id) || [],
   });
 
@@ -335,21 +335,21 @@ const ExpenseModal = ({ isOpen, onClose, onSuccess, expense }: any) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
             <div className="sm:col-span-2">
               <label className="block text-sm font-black text-slate-400 uppercase tracking-widest mb-2">Tiêu đề khoản chi</label>
-              <input 
+              <input
                 required
-                type="text" 
+                type="text"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 placeholder="VD: Đi siêu thị Winmart, Tiền điện..."
                 className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-bold text-lg"
               />
             </div>
-            
+
             <div className="flex flex-col">
               <label className="block text-sm font-black text-slate-400 uppercase tracking-widest mb-2">Số tiền (VND)</label>
-              <input 
+              <input
                 required
-                type="number" 
+                type="number"
                 min="1000"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
@@ -359,10 +359,10 @@ const ExpenseModal = ({ isOpen, onClose, onSuccess, expense }: any) => {
             </div>
 
             <div className="flex flex-col">
-              <label className="block text-sm font-black text-slate-400 uppercase tracking-widest mb-2">Ngày chi</label>
-              <input 
+              <label className="block text-sm font-black text-slate-400 uppercase tracking-widest mb-2">Ngày chi (tháng/ngày/năm)</label>
+              <input
                 required
-                type="date" 
+                type="date"
                 value={formData.expenseDate}
                 onChange={(e) => setFormData({ ...formData, expenseDate: e.target.value })}
                 className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-bold"
