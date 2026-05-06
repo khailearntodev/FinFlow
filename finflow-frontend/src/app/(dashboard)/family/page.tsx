@@ -256,8 +256,8 @@ export default function FamilyPage() {
         </div>
       </div>
       {isSettingsModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/60 backdrop-blur-sm p-4 flex items-start md:items-center justify-center">
+          <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300 my-auto">
             <div className="bg-indigo-600 px-8 py-6 flex items-center justify-between text-white">
               <h2 className="text-2xl font-black">Thiết lập gia đình</h2>
               <button onClick={() => setIsSettingsModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
