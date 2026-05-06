@@ -217,7 +217,7 @@ export default function ExpensesPage() {
                     </td>
                     <td className="px-4 md:px-8 py-4 md:py-6">
                       <div className="flex items-center justify-center gap-2">
-                        {expense.status === 'PENDING' && (user?.email === expense.paidByEmail || user?.role === 'HEAD') ? (
+                        {expense.status === 'PENDING' ? (
                           <>
                             <button
                               onClick={() => {
@@ -303,7 +303,7 @@ const ExpenseModal = ({ isOpen, onClose, onSuccess, expense }: any) => {
         await expenseService.update(user.family.id, expense.id, formData, user.id);
         showToast('Đã cập nhật khoản chi!', 'success');
       } else {
-        await expenseService.create(formData);
+        await expenseService.create(formData, user.id);
         showToast('Đã ghi nhận khoản chi mới!', 'success');
       }
       onSuccess();

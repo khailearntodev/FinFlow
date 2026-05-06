@@ -50,6 +50,12 @@ public class Expense {
     @Column(name = "created_at", updatable = false)
     private ZonedDateTime createdAt;
 
+    @Column(name = "created_by")
+    private UUID createdBy;
+
+    @Column(name = "updated_by")
+    private UUID updatedBy;
+
     @OneToMany(mappedBy = "expense", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<ExpenseParticipant> participants = new ArrayList<>();

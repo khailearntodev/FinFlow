@@ -34,13 +34,16 @@ public class ExpenseService {
     private final AuditService auditService;
 
     @Transactional
-    public String createExpense(ExpenseCreateRequest expenseCreateRequest) {
-        User user = userRepository.findByEmail(expenseCreateRequest.getPaidByEmail())
+    public String createExpense(ExpenseCreateRequest expenseCreateRequest, UUID operatorId) {
+        User operator = userRepository.findById(operatorId)
+                .orElseThrow(() -> new ExpenseException("Không tìm thấy người thực hiện!"));
+
+        User payer = userRepository.findByEmail(expenseCreateRequest.getPaidByEmail())
                 .orElseThrow(() -> new ExpenseException("Không tìm thấy người chi tiền!"));
 
-        if (user.getFamily() == null) throw new ExpenseException("Người chi tiền phải thuộc về 1 gia đình!");
+        if (payer.getFamily() == null) throw new ExpenseException("Người chi tiền phải thuộc về 1 gia đình!");
 
-        List<UUID> familyMemberIds = user.getFamily().getMembers().stream()
+        List<UUID> familyMemberIds = payer.getFamily().getMembers().stream()
                 .map(User::getId)
                 .toList();
 
@@ -51,12 +54,13 @@ public class ExpenseService {
         }
 
         Expense expense = Expense.builder()
-                .familyId(user.getFamily().getId())
+                .familyId(payer.getFamily().getId())
                 .status(ExpenseStatus.PENDING)
                 .amount(expenseCreateRequest.getAmount())
                 .expenseDate(expenseCreateRequest.getExpenseDate())
                 .title(expenseCreateRequest.getTitle())
-                .paidByUserId(user.getId().toString())
+                .paidByUserId(payer.getId().toString())
+                .createdBy(operatorId)
                 .build();
 
         List<ExpenseParticipant> participants = new ArrayList<>(
@@ -71,15 +75,15 @@ public class ExpenseService {
         expenseRepository.save(expense);
 
         auditService.logExpenseChange(
-                user.getFamily().getId(),
-                user.getId(),
+                payer.getFamily().getId(),
+                operatorId,
                 AuditEnum.CREATE,
                 expense.getId(),
                 null,
                 extractExpenseSnapshot(expense)
         );
 
-        return "Đã ghi nhận khoản chi " + expense.getAmount() + " của " + user.getFullName() + " thành công!";
+        return "Đã ghi nhận khoản chi " + expense.getAmount() + " của " + payer.getFullName() + " thành công!";
     }
 
     @Transactional
@@ -166,13 +170,6 @@ public class ExpenseService {
             throw new ExpenseException("Không được xóa khoản chi đã chốt sổ");
         }
 
-        boolean isNotPayer = !userId.toString().equals(expense.getPaidByUserId());
-        boolean isNotHead = user.getRole() != RoleEnum.HEAD;
-
-        if (isNotPayer && isNotHead) {
-            throw new ExpenseException("Chỉ người chi trả hoặc chủ hộ mới được xóa khoản chi");
-        }
-
         if (!expense.getFamilyId().equals(familyId)) {
             throw new ExpenseException("Đây không phải khoản chi thuộc về gia đình này");
         }
@@ -209,13 +206,6 @@ public class ExpenseService {
             throw new ExpenseException("Khoản chi đã được kết sổ rồi, không thể sửa");
         }
  
-        boolean isNotPayer = !userId.toString().equals(expense.getPaidByUserId());
-        boolean isNotHead = user.getRole() != RoleEnum.HEAD;
- 
-        if (isNotPayer && isNotHead) {
-            throw new ExpenseException("Chỉ người chi trả hoặc chủ hộ mới được sửa khoản chi");
-        }
- 
         User payer = userRepository.findByEmail(expenseCreateRequest.getPaidByEmail())
                 .orElseThrow(() -> new ExpenseException("Người thanh toán không hợp lệ"));
  
@@ -239,6 +229,7 @@ public class ExpenseService {
         expense.setAmount(expenseCreateRequest.getAmount());
         expense.setExpenseDate(expenseCreateRequest.getExpenseDate());
         expense.setPaidByUserId(payer.getId().toString());
+        expense.setUpdatedBy(userId);
 
         expense.getParticipants().clear();
         List<ExpenseParticipant> newParticipants = expenseCreateRequest.getParticipantIDs().stream()
@@ -253,7 +244,7 @@ public class ExpenseService {
 
         auditService.logExpenseChange(
                 expense.getFamilyId(),
-                payer.getId(),
+                userId,
                 AuditEnum.UPDATE,
                 expense.getId(),
                 oldData,
