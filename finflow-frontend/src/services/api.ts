@@ -35,7 +35,7 @@ export const familyService = {
 };
 
 export const expenseService = {
-  create: (data: any) => api.post('/expense/create', data),
+  create: (data: any, userId: string) => api.post(`/expense/create?userId=${userId}`, data),
   getAll: (familyId: string) => api.get(`/expense/get-all?familyId=${familyId}`),
   getById: (familyId: string, expenseId: string) => api.get(`/expense/get?familyId=${familyId}&expenseId=${expenseId}`),
   update: (familyId: string, expenseId: string, data: any, userId: string) => api.put(`/expense/update?familyId=${familyId}&expenseId=${expenseId}&userId=${userId}`, data),

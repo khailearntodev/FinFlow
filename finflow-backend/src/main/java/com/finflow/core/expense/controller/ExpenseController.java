@@ -5,8 +5,6 @@ import com.finflow.core.expense.dto.ExpenseResponse;
 import com.finflow.core.expense.service.ExpenseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.apache.coyote.Response;
-import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,8 +17,10 @@ public class ExpenseController {
     private final ExpenseService expenseService;
 
     @PostMapping("/create")
-    public ResponseEntity<String> createExpense(@Valid @RequestBody ExpenseCreateRequest expenseCreateRequest) {
-        expenseService.createExpense(expenseCreateRequest);
+    public ResponseEntity<String> createExpense(
+            @RequestParam("userId") UUID userId,
+            @Valid @RequestBody ExpenseCreateRequest expenseCreateRequest) {
+        expenseService.createExpense(expenseCreateRequest, userId);
         return ResponseEntity.ok("Đã tạo bản ghi chi tiêu thành công!");
     }
 
