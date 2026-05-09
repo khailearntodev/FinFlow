@@ -30,6 +30,7 @@ import com.finflow.core.settlement.dto.SettlementResponse;
 import com.finflow.core.settlement.repository.SettlementBillRepository;
 import com.finflow.core.settlement.repository.SettlementRepository;
 import com.finflow.core.storage.service.StorageService;
+import com.finflow.core.notification.service.EmailService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -49,6 +50,7 @@ public class SettlementService {
     private final ExpenseRepository expenseRepository;
 
     private final StorageService storageService;
+    private final EmailService emailService;
 
     @Transactional
     public SettlementResponse createSettlement(SettlementCreateRequest settlementCreateRequest) {
@@ -212,7 +214,37 @@ public class SettlementService {
         bill.setStatus(SettlementBillStatusEnum.WAITING_FOR_CONFIRMATION);
         settlementBillRepository.save(bill);
 
+        notifyOtherMembersOfPaymentProof(user, bill);
+
         return "Nộp minh chứng thành công! Đang đợi chủ hộ xác nhận!";
+    }
+
+    private void notifyOtherMembersOfPaymentProof(User payer, SettlementBill bill) {
+        Family family = payer.getFamily();
+        if (family == null) return;
+
+        String subject = "🔔 Thông báo: Thành viên " + payer.getFullName() + " đã nộp minh chứng thanh toán";
+        String body = String.format(
+                "<html>" +
+                        "<body>" +
+                        "<h2>Thông báo nộp minh chứng thanh toán</h2>" +
+                        "<p>Thành viên <b>%s</b> đã nộp minh chứng thanh toán cho kỳ chốt sổ tháng <b>%d/%d</b>.</p>" +
+                        "<p>Số tiền: <b>%,.0f VND</b></p>" +
+                        "<p>Trạng thái hóa đơn: <b>Đang chờ xác nhận</b></p>" +
+                        "<p>Vui lòng đăng nhập vào hệ thống FinFlow để kiểm tra.</p>" +
+                        "<hr/>" +
+                        "<p><i>Đây là email tự động từ hệ thống FinFlow.</i></p>" +
+                        "</body>" +
+                        "</html>",
+                payer.getFullName(),
+                bill.getSettlement().getMonth(),
+                bill.getSettlement().getYear(),
+                bill.getAmount().abs()
+        );
+
+        family.getMembers().stream()
+                .filter(member -> !member.getId().equals(payer.getId()))
+                .forEach(member -> emailService.sendEmail(member.getEmail(), subject, body));
     }
 
     @Transactional
