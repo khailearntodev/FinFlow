@@ -19,9 +19,19 @@ import com.finflow.core.family.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
+
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
 import javax.management.relation.Role;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.*;
 
 @Service
@@ -282,5 +292,77 @@ public class ExpenseService {
         }
 
         return snapshot;
+    }
+
+    @Transactional
+    public byte[] exportMonthlyExpensesToExcel(UUID familyId, int month, int year) {
+        Family family = familyRepository.findById(familyId).orElseThrow(
+                () -> new ExpenseException("Không tìm thấy gia đình")
+        );
+
+        List<Expense> expenses = expenseRepository.findByFamilyIdAndMonthAndYear(familyId, month, year);
+
+        if (expenses.isEmpty()) {
+            throw new ExpenseException("Không có khoản chi nào trong tháng " + month + "/" + year);
+        }
+
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Chi tieu Thang " + month + "-" + year);
+
+            Row headerRow = sheet.createRow(0);
+            String[] headers = {"Ngày chi", "Tiêu đề", "Số tiền (VND)", "Người chi trả", "Người tham gia chia tiền", "Trạng thái"};
+            
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            int rowIdx = 1;
+            for (Expense expense : expenses) {
+                Row row = sheet.createRow(rowIdx++);
+
+                // Cột 0: Ngày chi
+                row.createCell(0).setCellValue(expense.getExpenseDate().toString());
+                
+                // Cột 1: Tiêu đề
+                row.createCell(1).setCellValue(expense.getTitle());
+                
+                // Cột 2: Số tiền
+                row.createCell(2).setCellValue(expense.getAmount().doubleValue());
+
+                // Cột 3: Người chi trả
+                User payer = userRepository.findById(UUID.fromString(expense.getPaidByUserId())).orElse(null);
+                row.createCell(3).setCellValue(payer != null ? payer.getFullName() : "N/A");
+
+                // Cột 4: Danh sách người tham gia
+                List<UUID> participantIds = expense.getParticipants().stream()
+                        .map(ep -> ep.getId().getUserId())
+                        .toList();
+                List<String> participantNames = userRepository.findAllById(participantIds).stream()
+                        .map(User::getFullName)
+                        .toList();
+                row.createCell(4).setCellValue(String.join(", ", participantNames));
+
+                // Cột 5: Trạng thái
+                String statusVi = expense.getStatus() == ExpenseStatus.SETTLED ? "Đã chốt sổ" : "Chưa chốt";
+                row.createCell(5).setCellValue(statusVi);
+            }
+
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            workbook.write(out);
+            return out.toByteArray();
+
+        } catch (IOException e) {
+            throw new ExpenseException("Lỗi khi tạo file Excel: " + e.getMessage());
+        }
     }
 }
