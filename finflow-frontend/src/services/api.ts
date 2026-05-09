@@ -60,6 +60,7 @@ export const settlementService = {
   },
   confirmPayment: (billId: string, email: string) => api.post(`/settlement/bills/${billId}/confirm?email=${email}`),
   cancel: (settlementId: string, email: string) => api.delete(`/settlement/${settlementId}/cancel?email=${email}`),
+  remind: (billId: string, email: string) => api.post(`/settlement/bills/${billId}/remind?email=${email}`),
 };
 
 export const auditService = {

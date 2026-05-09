@@ -59,4 +59,11 @@ public class SettlementController {
             @RequestParam("email") String email) {
         return ResponseEntity.ok(settlementService.cancelSettlement(settlementId, email));
     }
+
+    @PostMapping("/bills/{billId}/remind")
+    public ResponseEntity<String> remindPayment(
+            @PathVariable UUID billId,
+            @RequestParam("email") String email) {
+        return ResponseEntity.ok(settlementService.remindPayment(billId, email));
+    }
 }
