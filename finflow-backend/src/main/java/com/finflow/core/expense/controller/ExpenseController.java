@@ -52,4 +52,21 @@ public class ExpenseController {
         ExpenseResponse updatedExpense = expenseService.updateExpense(familyId, expenseId, request, userId);
         return ResponseEntity.ok(updatedExpense);
     }
+
+    @GetMapping("/export-excel")
+    public ResponseEntity<byte[]> exportMonthlyExpensesToExcel(
+            @RequestParam("familyId") UUID familyId,
+            @RequestParam("month") int month,
+            @RequestParam("year") int year) {
+
+        byte[] excelData = expenseService.exportMonthlyExpensesToExcel(familyId, month, year);
+
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment", "Chi_Tieu_Thang_" + month + "_" + year + ".xlsx");
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(excelData);
+    }
 }
