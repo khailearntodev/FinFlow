@@ -40,6 +40,10 @@ export const expenseService = {
   getById: (familyId: string, expenseId: string) => api.get(`/expense/get?familyId=${familyId}&expenseId=${expenseId}`),
   update: (familyId: string, expenseId: string, data: any, userId: string) => api.put(`/expense/update?familyId=${familyId}&expenseId=${expenseId}&userId=${userId}`, data),
   delete: (familyId: string, expenseId: string, userId: string) => api.delete(`/expense/${expenseId}?familyId=${familyId}&userId=${userId}`),
+  exportExcel: (familyId: string, month: number, year: number) =>
+    api.get(`/expense/export-excel?familyId=${familyId}&month=${month}&year=${year}`, {
+      responseType: 'blob',
+    }),
 };
 
 export const settlementService = {

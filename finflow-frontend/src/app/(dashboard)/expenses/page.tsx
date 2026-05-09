@@ -13,7 +13,8 @@ import {
   ChevronDown,
   X,
   Loader2,
-  Lock
+  Lock,
+  Download
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -77,6 +78,31 @@ export default function ExpensesPage() {
       setLoading(false);
     }
   };
+  
+  const handleExportExcel = async () => {
+    if (!user?.family?.id || !selectedMonth) return;
+    
+    setLoading(true);
+    try {
+      const [year, month] = selectedMonth.split('-').map(Number);
+      const response = await expenseService.exportExcel(user.family.id, month, year);
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Chi_Tieu_Thang_${month}_${year}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      showToast('Đã tải xuống file Excel thành công!', 'success');
+    } catch (error) {
+      showToast('Lỗi khi xuất file Excel: ' + getErrorMessage(error), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredExpenses = expenses
     .filter(e => {
@@ -100,16 +126,26 @@ export default function ExpensesPage() {
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Chi tiêu chung</h1>
           <p className="mt-2 text-slate-500 font-medium">Danh sách tất cả các khoản chi tiêu của gia đình.</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingExpense(null);
-            setIsModalOpen(true);
-          }}
-          className="flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-6 py-4 font-bold text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 w-full md:w-auto"
-        >
-          <Plus className="h-5 w-5" />
-          Thêm khoản chi
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <button
+            onClick={handleExportExcel}
+            disabled={loading}
+            className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-6 py-4 font-bold text-white shadow-xl shadow-emerald-200 hover:bg-emerald-700 transition-all active:scale-95 flex-1 sm:flex-none disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
+            Xuất Excel
+          </button>
+          <button
+            onClick={() => {
+              setEditingExpense(null);
+              setIsModalOpen(true);
+            }}
+            className="flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-6 py-4 font-bold text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 flex-1 sm:flex-none"
+          >
+            <Plus className="h-5 w-5" />
+            Thêm khoản chi
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
