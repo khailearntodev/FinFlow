@@ -16,7 +16,8 @@ import {
   X,
   Loader2,
   Calendar,
-  ExternalLink
+  ExternalLink,
+  Bell
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -279,6 +280,15 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
     }
   };
 
+  const handleRemind = async () => {
+    try {
+      await settlementService.remind(bill.id, user.email);
+      alert('Đã gửi email nhắc nhở!');
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Lỗi gửi nhắc nhở');
+    }
+  };
+
   const statusConfig = {
     PENDING: { color: 'text-amber-500', bg: 'bg-amber-50', icon: Clock, label: 'Chờ thanh toán' },
     WAITING_FOR_CONFIRMATION: { color: 'text-blue-500', bg: 'bg-blue-50', icon: AlertCircle, label: 'Chờ xác nhận' },
@@ -411,9 +421,18 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
             
             {/* Cảnh báo nếu chưa có minh chứng nhưng ông A muốn duyệt sớm (Optionally) */}
             {!isMyBill && isDebtor && bill.status === 'PENDING' && (
-              <p className="text-[10px] text-slate-400 font-bold text-center mt-2 italic">
-                Chờ {bill.fullName.split(' ').pop()} nộp minh chứng...
-              </p>
+              <div className="space-y-3 mt-2">
+                <button 
+                  onClick={handleRemind}
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-amber-100 rounded-2xl text-xs font-black text-amber-700 hover:bg-amber-200 transition-all"
+                >
+                  <Bell className="h-4 w-4" />
+                  Nhắc đóng tiền qua Email
+                </button>
+                <p className="text-[10px] text-slate-400 font-bold text-center italic">
+                  Chờ {bill.fullName.split(' ').pop()} nộp minh chứng...
+                </p>
+              </div>
             )}
           </div>
         )}

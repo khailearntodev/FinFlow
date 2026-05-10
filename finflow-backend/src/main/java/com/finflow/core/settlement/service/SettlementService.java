@@ -40,6 +40,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.concurrent.ConcurrentHashMap;
+
 @Service
 @RequiredArgsConstructor
 public class SettlementService {
@@ -52,23 +56,24 @@ public class SettlementService {
     private final StorageService storageService;
     private final EmailService emailService;
 
+    private final Map<UUID, LocalDateTime> lastRemindedMap = new ConcurrentHashMap<>();
+
     @Transactional
     public SettlementResponse createSettlement(SettlementCreateRequest settlementCreateRequest) {
         User holdFamily = userRepository.findByEmail(settlementCreateRequest.getHoldEmail())
                 .orElseThrow(
-                        () -> new SettlementException("Không tìm thấy người tạo yêu cầu kết sổ")
-                );
+                        () -> new SettlementException("Không tìm thấy người tạo yêu cầu kết sổ"));
 
         Family family = familyRepository.findById(UUID.fromString(settlementCreateRequest.getFamilyId())).orElseThrow(
-                () -> new SettlementException("Không tìm thấy gia đình")
-        );
+                () -> new SettlementException("Không tìm thấy gia đình"));
 
         boolean isFamilyHead = family.getMembers().contains(holdFamily);
         if (!isFamilyHead || holdFamily.getRole() == RoleEnum.USER) {
             throw new ExpenseException("Chỉ chủ hộ của gia đình mới được tạo Kết sổ");
         }
 
-        if (settlementRepository.findByFamilyIdAndMonthAndYear(family.getId(), settlementCreateRequest.getMonth(), settlementCreateRequest.getYear()).isPresent()) {
+        if (settlementRepository.findByFamilyIdAndMonthAndYear(family.getId(), settlementCreateRequest.getMonth(),
+                settlementCreateRequest.getYear()).isPresent()) {
             throw new SettlementException("Tháng này đã được chốt sổ rồi!");
         }
 
@@ -77,7 +82,8 @@ public class SettlementService {
                 .filter(e -> e.getStatus() == ExpenseStatus.PENDING)
                 .filter(e -> {
                     // Chốt sổ cho tháng T, năm Y sẽ bao gồm các khoản chi từ tháng T trở về trước
-                    if (e.getExpenseDate().getYear() < settlementCreateRequest.getYear()) return true;
+                    if (e.getExpenseDate().getYear() < settlementCreateRequest.getYear())
+                        return true;
                     if (e.getExpenseDate().getYear() == settlementCreateRequest.getYear()) {
                         return e.getExpenseDate().getMonthValue() <= settlementCreateRequest.getMonth();
                     }
@@ -89,30 +95,31 @@ public class SettlementService {
             throw new SettlementException("Không có khoản chi nào cần kết sổ");
         }
 
-        Map<UUID, BigDecimal> paidMap = new HashMap<UUID,BigDecimal>();
-        Map<UUID, BigDecimal> owedMap = new HashMap<UUID,BigDecimal>();
+        Map<UUID, BigDecimal> paidMap = new HashMap<UUID, BigDecimal>();
+        Map<UUID, BigDecimal> owedMap = new HashMap<UUID, BigDecimal>();
 
-        for (User user: family.getMembers()) {
+        for (User user : family.getMembers()) {
             paidMap.put(user.getId(), BigDecimal.ZERO);
             owedMap.put(user.getId(), BigDecimal.ZERO);
         }
 
-        for (Expense expense: pendingExpenses) {
-            //1. Người nào trả tiền thì cộng vào ví paidMap
+        for (Expense expense : pendingExpenses) {
+            // 1. Người nào trả tiền thì cộng vào ví paidMap
             UUID payerId = UUID.fromString(expense.getPaidByUserId());
             paidMap.put(payerId, paidMap.get(payerId).add(expense.getAmount()));
 
-            //2. Chia nợ đều cho những người tham gia (bao gồm người chi trả)
+            // 2. Chia nợ đều cho những người tham gia (bao gồm người chi trả)
             int participantCount = expense.getParticipants().size();
-            BigDecimal shareAmount = expense.getAmount().divide(BigDecimal.valueOf(participantCount), 2, RoundingMode.HALF_UP);
+            BigDecimal shareAmount = expense.getAmount().divide(BigDecimal.valueOf(participantCount), 2,
+                    RoundingMode.HALF_UP);
 
-            //3. xử lý tiền lẻ
+            // 3. xử lý tiền lẻ
             BigDecimal totalShared = shareAmount.multiply(BigDecimal.valueOf(participantCount));
             BigDecimal remainder = expense.getAmount().subtract(totalShared);
 
-            //4. Phân bổ tiền
+            // 4. Phân bổ tiền
             boolean remainderAssigned = false;
-            for (ExpenseParticipant participant: expense.getParticipants()) {
+            for (ExpenseParticipant participant : expense.getParticipants()) {
                 UUID pID = participant.getId().getUserId();
                 BigDecimal amountToOwe = shareAmount;
                 if (!remainderAssigned && remainder.compareTo(BigDecimal.ZERO) != 0) {
@@ -123,7 +130,7 @@ public class SettlementService {
             }
         }
 
-        //5. tạo chốt sổ tháng
+        // 5. tạo chốt sổ tháng
         Settlement settlement = Settlement.builder()
                 .familyId(UUID.fromString(settlementCreateRequest.getFamilyId()))
                 .month(settlementCreateRequest.getMonth())
@@ -133,15 +140,15 @@ public class SettlementService {
 
         settlementRepository.save(settlement);
 
-        //6. Tính công nợ cuối cùng
+        // 6. Tính công nợ cuối cùng
         List<SettlementBill> billsToSave = new ArrayList<>();
         List<BillDetail> billDetails = new ArrayList<>();
         BigDecimal totalVerification = BigDecimal.ZERO;
 
-        for (User member: family.getMembers()) {
+        for (User member : family.getMembers()) {
             UUID memberId = member.getId();
 
-            //tiền cuối cùng = số phải trả (mắc nợ) - số đã chi
+            // tiền cuối cùng = số phải trả (mắc nợ) - số đã chi
             BigDecimal netAmount = owedMap.get(memberId).subtract(paidMap.get(memberId));
             totalVerification = totalVerification.add(netAmount);
 
@@ -162,20 +169,20 @@ public class SettlementService {
                     .build());
         }
 
-        //7. Kiểm tra dòng tiền đúng chưa
+        // 7. Kiểm tra dòng tiền đúng chưa
         if (totalVerification.compareTo(BigDecimal.ZERO) != 0) {
             throw new SettlementException("Dòng tiền bị thất thoát");
         }
 
-        //8. lưu dữ liệu
+        // 8. lưu dữ liệu
         settlementBillRepository.saveAll(billsToSave);
-        for (Expense expense: pendingExpenses) {
+        for (Expense expense : pendingExpenses) {
             expense.setStatus(ExpenseStatus.SETTLED);
             expense.setSettlementId(settlement.getId());
         }
         expenseRepository.saveAll(pendingExpenses);
 
-        //9. trả về cho fe
+        // 9. trả về cho fe
         return SettlementResponse.builder()
                 .settlementId(settlement.getId().toString())
                 .month(settlement.getMonth())
@@ -189,12 +196,10 @@ public class SettlementService {
     @Transactional
     public String submitPaymentProof(UUID billId, String userEmail, MultipartFile proofFile) {
         User user = userRepository.findByEmail(userEmail).orElseThrow(
-                () -> new SettlementException("Không tìm thấy người dùng")
-        );
+                () -> new SettlementException("Không tìm thấy người dùng"));
 
         SettlementBill bill = settlementBillRepository.findById(billId).orElseThrow(
-                () -> new SettlementException("Không tìm thấy hóa đơn")
-        );
+                () -> new SettlementException("Không tìm thấy hóa đơn"));
 
         if (bill.getStatus() != SettlementBillStatusEnum.PENDING) {
             throw new SettlementException("Hóa đơn không hợp lệ, vui lòng chọn đúng hóa đơn tháng này");
@@ -221,7 +226,8 @@ public class SettlementService {
 
     private void notifyOtherMembersOfPaymentProof(User payer, SettlementBill bill) {
         Family family = payer.getFamily();
-        if (family == null) return;
+        if (family == null)
+            return;
 
         String subject = "🔔 Thông báo: Thành viên " + payer.getFullName() + " đã nộp minh chứng thanh toán";
         String body = String.format(
@@ -239,8 +245,7 @@ public class SettlementService {
                 payer.getFullName(),
                 bill.getSettlement().getMonth(),
                 bill.getSettlement().getYear(),
-                bill.getAmount().abs()
-        );
+                bill.getAmount().abs());
 
         family.getMembers().stream()
                 .filter(member -> !member.getId().equals(payer.getId()))
@@ -250,12 +255,10 @@ public class SettlementService {
     @Transactional
     public String confirmPayment(UUID billId, String headEmail) {
         User head = userRepository.findByEmail(headEmail).orElseThrow(
-                () -> new SettlementException("Không tìm thấy chủ hộ")
-        );
+                () -> new SettlementException("Không tìm thấy chủ hộ"));
 
         SettlementBill bill = settlementBillRepository.findById(billId).orElseThrow(
-                () -> new SettlementException("Không tìm thấy hóa đơn!")
-        );
+                () -> new SettlementException("Không tìm thấy hóa đơn!"));
 
         Settlement settlement = bill.getSettlement();
 
@@ -329,15 +332,14 @@ public class SettlementService {
                 })
                 .toList();
     }
+
     @Transactional
     public String cancelSettlement(UUID settlementId, String headEmail) {
         User head = userRepository.findByEmail(headEmail).orElseThrow(
-                () -> new SettlementException("Không tìm thấy chủ hộ")
-        );
+                () -> new SettlementException("Không tìm thấy chủ hộ"));
 
         Settlement settlement = settlementRepository.findById(settlementId).orElseThrow(
-                () -> new SettlementException("Không tìm thấy kỳ chốt sổ")
-        );
+                () -> new SettlementException("Không tìm thấy kỳ chốt sổ"));
 
         if (head.getRole() != RoleEnum.HEAD || !head.getFamily().getId().equals(settlement.getFamilyId())) {
             throw new SettlementException("Chỉ có chủ hộ mới có quyền hủy chốt sổ");
@@ -345,7 +347,7 @@ public class SettlementService {
 
         boolean hasPayments = settlement.getSettlementBills().stream()
                 .anyMatch(b -> b.getStatus() != SettlementBillStatusEnum.PENDING);
-        
+
         if (hasPayments) {
             throw new SettlementException("Không thể hủy kỳ chốt sổ khi đã có thành viên thực hiện thanh toán!");
         }
@@ -365,5 +367,63 @@ public class SettlementService {
         settlementRepository.delete(settlement);
 
         return "Hủy kỳ chốt sổ thành công! Dữ liệu đã được mở khóa.";
+    }
+
+    @Transactional
+    public String remindPayment(UUID billId, String headEmail) {
+        User head = userRepository.findByEmail(headEmail).orElseThrow(
+                () -> new SettlementException("Không tìm thấy chủ hộ"));
+
+        SettlementBill bill = settlementBillRepository.findById(billId).orElseThrow(
+                () -> new SettlementException("Không tìm thấy hóa đơn!"));
+
+        if (head.getRole() != RoleEnum.HEAD || !head.getFamily().getId().equals(bill.getSettlement().getFamilyId())) {
+            throw new SettlementException("Chỉ có chủ hộ mới có quyền nhắc thanh toán");
+        }
+
+        if (bill.getStatus() != SettlementBillStatusEnum.PENDING) {
+            throw new SettlementException("Chỉ có thể nhắc thanh toán cho hóa đơn chưa đóng");
+        }
+
+        LocalDateTime lastReminded = lastRemindedMap.get(billId);
+        if (lastReminded != null && lastReminded.plusHours(1).isAfter(LocalDateTime.now())) {
+            long minutesRemaining = Duration.between(LocalDateTime.now(), lastReminded.plusHours(1)).toMinutes();
+            throw new SettlementException(
+                    "Bạn chỉ có thể gửi nhắc nhở 1 lần mỗi giờ cho mỗi hóa đơn. Vui lòng thử lại sau "
+                            + minutesRemaining + " phút.");
+        }
+
+        User debtor = userRepository.findById(bill.getUserId()).orElseThrow(
+                () -> new SettlementException("Không tìm thấy người nợ"));
+
+        sendRemindEmail(head, debtor, bill);
+
+        lastRemindedMap.put(billId, LocalDateTime.now());
+
+        return "Đã gửi email nhắc nhở thành công đến " + debtor.getFullName();
+    }
+
+    private void sendRemindEmail(User head, User debtor, SettlementBill bill) {
+        String subject = "🔔 Nhắc nhở: Thanh toán công nợ tháng " + bill.getSettlement().getMonth() + "/"
+                + bill.getSettlement().getYear();
+        String body = String.format(
+                "<html>" +
+                        "<body>" +
+                        "<h2>Nhắc nhở thanh toán công nợ</h2>" +
+                        "<p>Chào <b>%s</b>,</p>" +
+                        "<p>Chủ hộ <b>%s</b> đã gửi lời nhắc bạn tất toán khoản nợ của tháng <b>%d/%d</b>.</p>" +
+                        "<p>Số tiền cần đóng: <b>%,.0f VND</b></p>" +
+                        "<p>Vui lòng đăng nhập vào hệ thống FinFlow để nộp minh chứng thanh toán sớm nhất có thể.</p>" +
+                        "<hr/>" +
+                        "<p><i>Đây là email tự động từ hệ thống FinFlow.</i></p>" +
+                        "</body>" +
+                        "</html>",
+                debtor.getFullName(),
+                head.getFullName(),
+                bill.getSettlement().getMonth(),
+                bill.getSettlement().getYear(),
+                bill.getAmount().abs());
+
+        emailService.sendEmail(debtor.getEmail(), subject, body);
     }
 }
