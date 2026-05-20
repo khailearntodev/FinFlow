@@ -40,12 +40,12 @@ export function Maintenance() {
           <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 p-6 rounded-3xl group hover:border-indigo-500/50 transition-all">
             <Timer className="h-6 w-6 text-indigo-400 mb-3 mx-auto" />
             <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Thời gian dự kiến</p>
-            <p className="text-white font-bold mt-1">30 Phút</p>
+            <p className="text-white font-bold mt-1">Liên hệ anh Khải nhóe</p>
           </div>
           <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 p-6 rounded-3xl group hover:border-emerald-500/50 transition-all">
             <Hammer className="h-6 w-6 text-emerald-400 mb-3 mx-auto" />
             <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Nâng cấp</p>
-            <p className="text-white font-bold mt-1">Tối ưu hóa DB</p>
+            <p className="text-white font-bold mt-1">Bảo trì định kỳ</p>
           </div>
           <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 p-6 rounded-3xl group hover:border-indigo-500/50 transition-all">
             <Settings2 className="h-6 w-6 text-indigo-400 mb-3 mx-auto" />
@@ -57,7 +57,7 @@ export function Maintenance() {
         <div className="pt-8">
           <p className="text-slate-500 text-sm font-bold flex items-center justify-center gap-2">
             <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse" />
-            Đội ngũ kỹ thuật đang làm việc hết công suất
+            Liên hệ anh Khải để biết thêm thông tin chi tiết nhóe
           </p>
         </div>
       </div>
