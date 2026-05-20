@@ -309,8 +309,16 @@ public class ExpenseService {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Chi tieu Thang " + month + "-" + year);
 
+            List<User> members = new ArrayList<>(family.getMembers());
+            members.sort(Comparator.comparing(User::getFullName));
+
+            List<String> headersList = new ArrayList<>(Arrays.asList("Ngày chi", "Tiêu đề", "Tổng số tiền (VND)", "Người chi trả", "Trạng thái"));
+            for (User member : members) {
+                headersList.add(member.getFullName());
+            }
+            String[] headers = headersList.toArray(new String[0]);
+
             Row headerRow = sheet.createRow(0);
-            String[] headers = {"Ngày chi", "Tiêu đề", "Số tiền (VND)", "Người chi trả", "Người tham gia chia tiền", "Trạng thái"};
             
             CellStyle headerStyle = workbook.createCellStyle();
             Font headerFont = workbook.createFont();
@@ -340,18 +348,27 @@ public class ExpenseService {
                 User payer = userRepository.findById(UUID.fromString(expense.getPaidByUserId())).orElse(null);
                 row.createCell(3).setCellValue(payer != null ? payer.getFullName() : "N/A");
 
-                // Cột 4: Danh sách người tham gia
+                // Cột 4: Trạng thái
+                String statusVi = expense.getStatus() == ExpenseStatus.SETTLED ? "Đã chốt sổ" : "Chưa chốt";
+                row.createCell(4).setCellValue(statusVi);
+
+                // Cột 5+: Tiền chia cho từng người
                 List<UUID> participantIds = expense.getParticipants().stream()
                         .map(ep -> ep.getId().getUserId())
                         .toList();
-                List<String> participantNames = userRepository.findAllById(participantIds).stream()
-                        .map(User::getFullName)
-                        .toList();
-                row.createCell(4).setCellValue(String.join(", ", participantNames));
+                
+                int numParticipants = participantIds.size();
+                double sharedAmount = numParticipants > 0 ? expense.getAmount().doubleValue() / numParticipants : 0.0;
 
-                // Cột 5: Trạng thái
-                String statusVi = expense.getStatus() == ExpenseStatus.SETTLED ? "Đã chốt sổ" : "Chưa chốt";
-                row.createCell(5).setCellValue(statusVi);
+                int colIdx = 5;
+                for (User member : members) {
+                    Cell cell = row.createCell(colIdx++);
+                    if (participantIds.contains(member.getId())) {
+                        cell.setCellValue(sharedAmount);
+                    } else {
+                        cell.setCellValue(0.0);
+                    }
+                }
             }
 
             for (int i = 0; i < headers.length; i++) {
