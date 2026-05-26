@@ -241,16 +241,29 @@ public class ExpenseService {
         expense.setPaidByUserId(payer.getId().toString());
         expense.setUpdatedBy(userId);
 
-        expense.getParticipants().clear();
-        List<ExpenseParticipant> newParticipants = expenseCreateRequest.getParticipantIDs().stream()
+        List<UUID> newParticipantIds = expenseCreateRequest.getParticipantIDs().stream()
                 .distinct()
-                .map(participantId -> new ExpenseParticipant(expense, participantId))
                 .toList();
-        expense.getParticipants().addAll(newParticipants);
 
-        expenseRepository.save(expense);
+        expense.getParticipants().removeIf(p -> !newParticipantIds.contains(p.getId().getUserId()));
+
+        List<UUID> currentParticipantIds = expense.getParticipants().stream()
+                .map(p -> p.getId().getUserId())
+                .toList();
+
+        for (UUID newId : newParticipantIds) {
+            if (!currentParticipantIds.contains(newId)) {
+                expense.getParticipants().add(new ExpenseParticipant(expense, newId));
+            }
+        }
+
+        // expenseRepository.save(expense); // Removed to prevent Hibernate merge duplication on attached entity
 
         Map<String, Object> newData = extractExpenseSnapshot(expense);
+        List<String> expectedParticipantIds = newParticipantIds.stream()
+                .map(UUID::toString)
+                .toList();
+        newData.put("participants", expectedParticipantIds);
 
         auditService.logExpenseChange(
                 expense.getFamilyId(),
