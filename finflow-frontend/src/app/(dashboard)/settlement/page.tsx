@@ -40,6 +40,7 @@ export default function SettlementPage() {
     onConfirm: () => {},
     type: 'info'
   });
+  const [isConfirming, setIsConfirming] = useState(false);
 
   const fetchSettlements = async () => {
     if (!user?.family?.id) {
@@ -67,6 +68,7 @@ export default function SettlementPage() {
       message: `Bạn có chắc chắn muốn chốt sổ cho tháng ${selectedMonth}/${selectedYear}? Toàn bộ các khoản chi tiêu PENDING sẽ bị khóa.`,
       type: 'info',
       onConfirm: async () => {
+        setIsConfirming(true);
         try {
           await settlementService.create({
             familyId: user.family.id,
@@ -79,6 +81,8 @@ export default function SettlementPage() {
         } catch (error: any) {
           alert(error.response?.data?.message || 'Không thể chốt sổ');
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        } finally {
+          setIsConfirming(false);
         }
       }
     });
@@ -91,6 +95,7 @@ export default function SettlementPage() {
       message: 'Bạn có chắc chắn muốn hủy kỳ chốt sổ này? Toàn bộ các khoản chi tiêu sẽ được mở khóa (PENDING).',
       type: 'danger',
       onConfirm: async () => {
+        setIsConfirming(true);
         try {
           await settlementService.cancel(settlementId, user.email);
           fetchSettlements();
@@ -98,6 +103,8 @@ export default function SettlementPage() {
         } catch (error: any) {
           alert(error.response?.data?.message || 'Không thể hủy chốt sổ');
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        } finally {
+          setIsConfirming(false);
         }
       }
     });
@@ -245,6 +252,7 @@ export default function SettlementPage() {
         title={confirmModal.title}
         message={confirmModal.message}
         type={confirmModal.type}
+        isLoading={isConfirming}
       />
     </div>
   );
@@ -256,6 +264,9 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
   const isMyBill = bill.userEmail === user.email;
   const isDebtor = bill.amount > 0; // Member owes money to Head
   const isCreditor = bill.amount < 0; // Head owes money to Member
+
+  const [confirming, setConfirming] = useState(false);
+  const [reminding, setReminding] = useState(false);
 
   const handleUploadProof = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -272,20 +283,26 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
   };
 
   const handleConfirm = async () => {
+    setConfirming(true);
     try {
       await settlementService.confirmPayment(bill.id, user.email);
       onUpdate();
     } catch (error: any) {
       alert(error.response?.data?.message || 'Lỗi xác nhận');
+    } finally {
+      setConfirming(false);
     }
   };
 
   const handleRemind = async () => {
+    setReminding(true);
     try {
       await settlementService.remind(bill.id, user.email);
       alert('Đã gửi email nhắc nhở!');
     } catch (error: any) {
       alert(error.response?.data?.message || 'Lỗi gửi nhắc nhở');
+    } finally {
+      setReminding(false);
     }
   };
 
@@ -390,10 +407,11 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
             {!isMyBill && isDebtor && bill.status === 'WAITING_FOR_CONFIRMATION' && (
               <button 
                 onClick={handleConfirm}
-                className="flex items-center justify-center gap-2 w-full py-4 bg-emerald-600 rounded-2xl text-xs font-black text-white shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all"
+                disabled={confirming}
+                className="flex items-center justify-center gap-2 w-full py-4 bg-emerald-600 rounded-2xl text-xs font-black text-white shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Check className="h-4 w-4" />
-                Xác nhận đã nhận tiền
+                {confirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                {confirming ? 'Đang xử lý...' : 'Xác nhận đã nhận tiền'}
               </button>
             )}
 
@@ -401,10 +419,11 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
             {isMyBill && isDebtor && bill.status === 'PENDING' && (
               <button 
                 onClick={handleConfirm}
-                className="flex items-center justify-center gap-2 w-full py-4 bg-slate-900 rounded-2xl text-xs font-black text-white shadow-xl shadow-slate-200 hover:bg-black transition-all"
+                disabled={confirming}
+                className="flex items-center justify-center gap-2 w-full py-4 bg-slate-900 rounded-2xl text-xs font-black text-white shadow-xl shadow-slate-200 hover:bg-black transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Check className="h-4 w-4" />
-                Xác nhận đã nộp vào quỹ
+                {confirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                {confirming ? 'Đang xử lý...' : 'Xác nhận đã nộp vào quỹ'}
               </button>
             )}
 
@@ -412,10 +431,11 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
             {isCreditor && bill.status === 'PENDING' && (
               <button 
                 onClick={handleConfirm}
-                className="flex items-center justify-center gap-2 w-full py-4 bg-indigo-600 rounded-2xl text-xs font-black text-white shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                disabled={confirming}
+                className="flex items-center justify-center gap-2 w-full py-4 bg-indigo-600 rounded-2xl text-xs font-black text-white shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Check className="h-4 w-4" />
-                Xác nhận đã trả tiền cho {bill.fullName.split(' ').pop()}
+                {confirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                {confirming ? 'Đang xử lý...' : `Xác nhận đã trả tiền cho ${bill.fullName.split(' ').pop()}`}
               </button>
             )}
             
@@ -424,10 +444,11 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
               <div className="space-y-3 mt-2">
                 <button 
                   onClick={handleRemind}
-                  className="flex items-center justify-center gap-2 w-full py-3 bg-amber-100 rounded-2xl text-xs font-black text-amber-700 hover:bg-amber-200 transition-all"
+                  disabled={reminding}
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-amber-100 rounded-2xl text-xs font-black text-amber-700 hover:bg-amber-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Bell className="h-4 w-4" />
-                  Nhắc đóng tiền qua Email
+                  {reminding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
+                  {reminding ? 'Đang gửi...' : 'Nhắc đóng tiền qua Email'}
                 </button>
                 <p className="text-[10px] text-slate-400 font-bold text-center italic">
                   Chờ {bill.fullName.split(' ').pop()} nộp minh chứng...

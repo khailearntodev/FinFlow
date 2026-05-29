@@ -290,7 +290,28 @@ public class SettlementService {
 
     @Transactional
     public List<SettlementResponse> getSettlementsByFamilyId(UUID familyId) {
-        return settlementRepository.findByFamilyId(familyId).stream()
+        List<Settlement> allSettlements = settlementRepository.findByFamilyId(familyId);
+        
+        Map<String, Settlement> bestSettlements = new HashMap<>();
+        for (Settlement s : allSettlements) {
+            String key = s.getMonth() + "-" + s.getYear();
+            Settlement existing = bestSettlements.get(key);
+            if (existing == null) {
+                bestSettlements.put(key, s);
+            } else {
+                long existingCompleted = existing.getSettlementBills().stream()
+                        .filter(b -> b.getStatus() == SettlementBillStatusEnum.COMPLETED).count();
+                long currentCompleted = s.getSettlementBills().stream()
+                        .filter(b -> b.getStatus() == SettlementBillStatusEnum.COMPLETED).count();
+                if (currentCompleted > existingCompleted) {
+                    bestSettlements.put(key, s);
+                } else if (currentCompleted == existingCompleted && s.getCreatedAt().isAfter(existing.getCreatedAt())) {
+                    bestSettlements.put(key, s);
+                }
+            }
+        }
+
+        return bestSettlements.values().stream()
                 .map(s -> SettlementResponse.builder()
                         .settlementId(s.getId().toString())
                         .month(s.getMonth())
