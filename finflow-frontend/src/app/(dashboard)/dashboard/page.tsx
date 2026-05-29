@@ -170,15 +170,27 @@ export default function DashboardPage() {
           </p>
 
           <div className="space-y-6 relative">
-            <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/10">
-              <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500">
-                <Clock className="h-6 w-6" />
+            {!pendingSettlement ? (
+              <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/10">
+                <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500">
+                  <Clock className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="font-bold">Đang chờ chốt sổ</p>
+                  <p className="text-xs text-slate-400">Ngày chốt: {user.family.billingDate} hàng tháng</p>
+                </div>
               </div>
-              <div>
-                <p className="font-bold">Đang chờ chốt sổ</p>
-                <p className="text-xs text-slate-400">Ngày chốt: {user.family.billingDate} hàng tháng</p>
+            ) : (
+              <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/10">
+                <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500">
+                  <Receipt className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="font-bold">Đang xử lý công nợ</p>
+                  <p className="text-xs text-slate-400">Vui lòng thanh toán hoặc xác nhận</p>
+                </div>
               </div>
-            </div>
+            )}
 
             {pendingSettlement && (
               <div className={cn(
