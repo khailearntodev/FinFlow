@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 import { settlementService } from '@/services/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -23,6 +24,7 @@ import { cn } from '@/lib/utils';
 
 export default function SettlementPage() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [settlements, setSettlements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -78,8 +80,9 @@ export default function SettlementPage() {
           });
           fetchSettlements();
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          showToast(`Đã chốt sổ thành công tháng ${targetMonth}/${targetYear}`, 'success');
         } catch (error: any) {
-          alert(error.response?.data?.message || 'Không thể chốt sổ');
+          showToast(error.response?.data?.message || 'Không thể chốt sổ', 'error');
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
         } finally {
           setIsConfirming(false);
@@ -100,8 +103,9 @@ export default function SettlementPage() {
           await settlementService.cancel(settlementId, user.email);
           fetchSettlements();
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          showToast('Đã hủy chốt sổ thành công', 'success');
         } catch (error: any) {
-          alert(error.response?.data?.message || 'Không thể hủy chốt sổ');
+          showToast(error.response?.data?.message || 'Không thể hủy chốt sổ', 'error');
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
         } finally {
           setIsConfirming(false);
@@ -260,6 +264,7 @@ export default function SettlementPage() {
 
 const BillCard = ({ bill, isHead, onUpdate }: any) => {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [uploading, setUploading] = useState(false);
   const isMyBill = bill.userEmail === user.email;
   const isDebtor = bill.amount > 0; // Member owes money to Head
@@ -274,9 +279,10 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
     setUploading(true);
     try {
       await settlementService.submitProof(bill.id, user.email, file);
+      showToast('Nộp minh chứng thành công', 'success');
       onUpdate();
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Lỗi upload');
+      showToast(error.response?.data?.message || 'Lỗi upload', 'error');
     } finally {
       setUploading(false);
     }
@@ -286,9 +292,10 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
     setConfirming(true);
     try {
       await settlementService.confirmPayment(bill.id, user.email);
+      showToast('Xác nhận thành công', 'success');
       onUpdate();
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Lỗi xác nhận');
+      showToast(error.response?.data?.message || 'Lỗi xác nhận', 'error');
     } finally {
       setConfirming(false);
     }
@@ -298,9 +305,9 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
     setReminding(true);
     try {
       await settlementService.remind(bill.id, user.email);
-      alert('Đã gửi email nhắc nhở!');
+      showToast('Đã gửi email nhắc nhở!', 'success');
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Lỗi gửi nhắc nhở');
+      showToast(error.response?.data?.message || 'Lỗi gửi nhắc nhở', 'error');
     } finally {
       setReminding(false);
     }
