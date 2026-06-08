@@ -1,23 +1,27 @@
 package com.finflow.core.notification.service;
 
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
-import java.io.UnsupportedEncodingException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    @Value("${BREVO_API_KEY}")
+    private String brevoApiKey;
 
     @Value("${SMTP_FROM}")
     private String fromEmail;
@@ -25,21 +29,39 @@ public class EmailService {
     @Value("${SMTP_FROM_NAME:FinFlow}")
     private String fromName;
 
+    private final RestTemplate restTemplate = new RestTemplate();
+
     @Async
     public void sendEmail(String to, String subject, String body) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            String url = "https://api.brevo.com/v3/smtp/email";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("accept", "application/json");
+            headers.set("api-key", brevoApiKey);
+
+            Map<String, Object> requestBody = new HashMap<>();
             
-            helper.setFrom(fromEmail, fromName);
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(body, true);
+            Map<String, String> sender = new HashMap<>();
+            sender.put("name", fromName);
+            sender.put("email", fromEmail);
+            requestBody.put("sender", sender);
+
+            Map<String, String> recipient = new HashMap<>();
+            recipient.put("email", to);
+            requestBody.put("to", List.of(recipient));
+
+            requestBody.put("subject", subject);
+            requestBody.put("htmlContent", body);
+
+            HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
+
+            ResponseEntity<String> response = restTemplate.postForEntity(url, requestEntity, String.class);
             
-            mailSender.send(message);
-            log.info("Email sent successfully to {}", to);
-        } catch (MessagingException | UnsupportedEncodingException e) {
-            log.error("Failed to send email to {}: {}", to, e.getMessage());
+            log.info("Email sent successfully to {} via Brevo API. Response: {}", to, response.getBody());
+        } catch (Exception e) {
+            log.error("Failed to send email to {} via Brevo API: {}", to, e.getMessage());
         }
     }
 }
