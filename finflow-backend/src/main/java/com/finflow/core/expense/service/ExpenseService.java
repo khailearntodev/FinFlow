@@ -313,7 +313,9 @@ public class ExpenseService {
                 () -> new ExpenseException("Không tìm thấy gia đình")
         );
 
-        List<Expense> expenses = expenseRepository.findByFamilyIdAndMonthAndYear(familyId, month, year);
+        java.time.LocalDate startDate = java.time.LocalDate.of(year, month, 1);
+        java.time.LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
+        List<Expense> expenses = expenseRepository.findByFamilyIdAndDateBetween(familyId, startDate, endDate);
 
         if (expenses.isEmpty()) {
             throw new ExpenseException("Không có khoản chi nào trong tháng " + month + "/" + year);

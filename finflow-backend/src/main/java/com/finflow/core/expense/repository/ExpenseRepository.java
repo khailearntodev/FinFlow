@@ -11,13 +11,15 @@ import java.util.UUID;
 @Repository
 public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
     Optional<Expense> findById(UUID expenseId);
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"participants"})
     List<Expense> findByFamilyId(UUID familyId);
 
-    @org.springframework.data.jpa.repository.Query("SELECT e FROM Expense e WHERE e.familyId = :familyId AND EXTRACT(MONTH FROM e.expenseDate) = :month AND EXTRACT(YEAR FROM e.expenseDate) = :year")
-    List<Expense> findByFamilyIdAndMonthAndYear(
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"participants"})
+    @org.springframework.data.jpa.repository.Query("SELECT e FROM Expense e WHERE e.familyId = :familyId AND e.expenseDate >= :startDate AND e.expenseDate <= :endDate")
+    List<Expense> findByFamilyIdAndDateBetween(
             @org.springframework.data.repository.query.Param("familyId") UUID familyId,
-            @org.springframework.data.repository.query.Param("month") int month,
-            @org.springframework.data.repository.query.Param("year") int year);
+            @org.springframework.data.repository.query.Param("startDate") java.time.LocalDate startDate,
+            @org.springframework.data.repository.query.Param("endDate") java.time.LocalDate endDate);
 
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional
