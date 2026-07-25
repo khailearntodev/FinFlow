@@ -292,6 +292,11 @@ public class SettlementService {
     public List<SettlementResponse> getSettlementsByFamilyId(UUID familyId) {
         List<Settlement> allSettlements = settlementRepository.findByFamilyId(familyId);
         
+        // Fetch all family members once to avoid N+1 query loop
+        Map<UUID, User> membersMap = familyRepository.findById(familyId)
+                .map(f -> f.getMembers().stream().collect(Collectors.toMap(User::getId, u -> u)))
+                .orElse(new HashMap<>());
+        
         Map<String, Settlement> bestSettlements = new HashMap<>();
         for (Settlement s : allSettlements) {
             String key = s.getMonth() + "-" + s.getYear();
@@ -320,7 +325,7 @@ public class SettlementService {
                         .createdAt(s.getCreatedAt())
                         .bills(s.getSettlementBills().stream()
                                 .map(b -> {
-                                    User user = userRepository.findById(b.getUserId()).orElse(null);
+                                    User user = membersMap.get(b.getUserId());
                                     return BillDetail.builder()
                                             .id(b.getId())
                                             .userEmail(user != null ? user.getEmail() : "N/A")
@@ -337,9 +342,9 @@ public class SettlementService {
 
     @Transactional
     public List<BillDetail> getBillsByUserId(UUID userId) {
+        User user = userRepository.findById(userId).orElse(null);
         return settlementBillRepository.findByUserId(userId).stream()
                 .map(b -> {
-                    User user = userRepository.findById(b.getUserId()).orElse(null);
                     return BillDetail.builder()
                             .id(b.getId())
                             .userEmail(user != null ? user.getEmail() : "N/A")
@@ -374,14 +379,7 @@ public class SettlementService {
         }
 
         // 1. Mở khóa chi tiêu
-        List<Expense> expenses = expenseRepository.findAll(); // Optimization: filter by settlementId in repo
-        expenses.stream()
-                .filter(e -> settlementId.equals(e.getSettlementId()))
-                .forEach(e -> {
-                    e.setStatus(ExpenseStatus.PENDING);
-                    e.setSettlementId(null);
-                });
-        expenseRepository.saveAll(expenses);
+        expenseRepository.unlockExpensesBySettlementId(settlementId);
 
         // 2. Xóa bills và settlement
         settlementBillRepository.deleteAll(settlement.getSettlementBills());

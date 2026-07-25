@@ -25,6 +25,11 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
     @org.springframework.transaction.annotation.Transactional
     void deleteByFamilyId(UUID familyId);
 
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Query("UPDATE Expense e SET e.status = com.finflow.core.enums.ExpenseStatus.PENDING, e.settlementId = null WHERE e.settlementId = :settlementId")
+    void unlockExpensesBySettlementId(@org.springframework.data.repository.query.Param("settlementId") UUID settlementId);
+
     @org.springframework.data.jpa.repository.Query("SELECT COUNT(e) > 0 FROM Expense e LEFT JOIN e.participants p " +
             "WHERE e.familyId = :familyId AND e.status = com.finflow.core.enums.ExpenseStatus.PENDING " +
             "AND (e.paidByUserId = :userIdStr OR p.id.userId = :userId)")

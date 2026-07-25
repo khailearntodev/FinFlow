@@ -140,17 +140,32 @@ public class ExpenseService {
 
         List<Expense> expenses = expenseRepository.findByFamilyId(familyId);
 
+        Set<UUID> allUserIds = new HashSet<>();
+        for (Expense expense : expenses) {
+            allUserIds.add(UUID.fromString(expense.getPaidByUserId()));
+            for (ExpenseParticipant ep : expense.getParticipants()) {
+                allUserIds.add(ep.getId().getUserId());
+            }
+        }
+        
+        Map<UUID, User> userMap = new HashMap<>();
+        if (!allUserIds.isEmpty()) {
+            userRepository.findAllById(allUserIds).forEach(user -> userMap.put(user.getId(), user));
+        }
+
         return expenses.stream().map(expense -> {
 
-            User payer = userRepository.findById(UUID.fromString(expense.getPaidByUserId()))
-                    .orElseThrow(() -> new ExpenseException("Không tìm thấy người chi trả cho khoản: " + expense.getTitle()));
+            User payer = userMap.get(UUID.fromString(expense.getPaidByUserId()));
+            if (payer == null) {
+                throw new ExpenseException("Không tìm thấy người chi trả cho khoản: " + expense.getTitle());
+            }
 
-            List<UUID> participantIds = expense.getParticipants().stream()
-                    .map(ep -> ep.getId().getUserId())
-                    .toList();
-
-            List<String> participantEmails = userRepository.findAllById(participantIds).stream()
-                    .map(User::getEmail)
+            List<String> participantEmails = expense.getParticipants().stream()
+                    .map(ep -> {
+                        User p = userMap.get(ep.getId().getUserId());
+                        return p != null ? p.getEmail() : null;
+                    })
+                    .filter(Objects::nonNull)
                     .toList();
 
             return ExpenseResponse.builder()
