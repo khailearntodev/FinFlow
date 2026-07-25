@@ -182,6 +182,9 @@ public class SettlementService {
         }
         expenseRepository.saveAll(pendingExpenses);
 
+        // 8.5. Gửi email thông báo cho tất cả thành viên
+        notifyFamilyMembersOfSettlement(family, settlement, billsToSave);
+
         // 9. trả về cho fe
         return SettlementResponse.builder()
                 .settlementId(settlement.getId().toString())
@@ -191,6 +194,47 @@ public class SettlementService {
                 .createdAt(settlement.getCreatedAt())
                 .bills(billDetails)
                 .build();
+    }
+
+    private void notifyFamilyMembersOfSettlement(Family family, Settlement settlement, List<SettlementBill> bills) {
+        String subject = "🔔 Thông báo: Kỳ chốt sổ tháng " + settlement.getMonth() + "/" + settlement.getYear() + " đã được tạo";
+        
+        for (User member : family.getMembers()) {
+            SettlementBill memberBill = bills.stream()
+                    .filter(b -> b.getUserId().equals(member.getId()))
+                    .findFirst().orElse(null);
+                    
+            if (memberBill == null) continue;
+            
+            String amountInfo = "";
+            if (memberBill.getAmount().compareTo(BigDecimal.ZERO) > 0) {
+                amountInfo = "<p>Bạn cần thanh toán: <b style=\"color: red;\">" + String.format("%,.0f", memberBill.getAmount()) + " VND</b></p>";
+            } else if (memberBill.getAmount().compareTo(BigDecimal.ZERO) < 0) {
+                amountInfo = "<p>Bạn sẽ nhận lại: <b style=\"color: green;\">" + String.format("%,.0f", memberBill.getAmount().abs()) + " VND</b></p>";
+            } else {
+                amountInfo = "<p>Bạn đã hoàn tất công nợ kỳ này (0 VND).</p>";
+            }
+
+            String body = String.format(
+                    "<html>" +
+                            "<body>" +
+                            "<h2>Kỳ chốt sổ mới đã được tạo</h2>" +
+                            "<p>Chào <b>%s</b>,</p>" +
+                            "<p>Chủ hộ đã tạo kỳ chốt sổ cho tháng <b>%d/%d</b>.</p>" +
+                            "%s" +
+                            "<p>Vui lòng đăng nhập vào hệ thống FinFlow để xem chi tiết và nộp minh chứng thanh toán nếu cần.</p>" +
+                            "<hr/>" +
+                            "<p><i>Đây là email tự động từ hệ thống FinFlow.</i></p>" +
+                            "</body>" +
+                            "</html>",
+                    member.getFullName(),
+                    settlement.getMonth(),
+                    settlement.getYear(),
+                    amountInfo
+            );
+
+            emailService.sendEmail(member.getEmail(), subject, body);
+        }
     }
 
     @Transactional
