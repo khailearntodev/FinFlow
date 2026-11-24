@@ -3,6 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 
 export const AuthGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
@@ -21,8 +22,9 @@ export const AuthGuard: React.FC<{ children: React.ReactNode }> = ({ children })
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-paper text-ink">
+        <Loader2 className="h-7 w-7 animate-spin text-accent motion-reduce:animate-none" aria-hidden="true" />
+        <p className="text-sm font-medium text-muted">Đang tải phiên làm việc…</p>
       </div>
     );
   }

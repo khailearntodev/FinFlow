@@ -96,7 +96,7 @@ public class ExpenseService {
         return "Đã ghi nhận khoản chi " + expense.getAmount() + " của " + payer.getFullName() + " thành công!";
     }
 
-    @Transactional
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ExpenseResponse getExpenseById(UUID familyId, UUID expenseId){
         Expense expense = expenseRepository.findById(expenseId).orElseThrow(
                 () -> new ExpenseException("Không tìm thấy khoảng chi tiêu " + expenseId)
@@ -132,12 +132,8 @@ public class ExpenseService {
                 .build();
     }
 
-    @Transactional
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<ExpenseResponse> getAllExpensesByFamilyId(UUID familyId){
-        Family family = familyRepository.findById(familyId).orElseThrow(
-                () -> new ExpenseException("Không tìm thấy gia đình " + familyId)
-        );
-
         List<Expense> expenses = expenseRepository.findByFamilyId(familyId);
 
         Set<UUID> allUserIds = new HashSet<>();
@@ -341,6 +337,10 @@ public class ExpenseService {
 
             List<User> members = new ArrayList<>(family.getMembers());
             members.sort(Comparator.comparing(User::getFullName));
+            Map<UUID, User> memberMap = new HashMap<>();
+            for (User member : members) {
+                memberMap.put(member.getId(), member);
+            }
 
             List<String> headersList = new ArrayList<>(Arrays.asList("Ngày chi", "Tiêu đề", "Tổng số tiền (VND)", "Người chi trả", "Trạng thái"));
             for (User member : members) {
@@ -375,7 +375,8 @@ public class ExpenseService {
                 row.createCell(2).setCellValue(expense.getAmount().doubleValue());
 
                 // Cột 3: Người chi trả
-                User payer = userRepository.findById(UUID.fromString(expense.getPaidByUserId())).orElse(null);
+                UUID payerId = UUID.fromString(expense.getPaidByUserId());
+                User payer = memberMap.computeIfAbsent(payerId, id -> userRepository.findById(id).orElse(null));
                 row.createCell(3).setCellValue(payer != null ? payer.getFullName() : "N/A");
 
                 // Cột 4: Trạng thái

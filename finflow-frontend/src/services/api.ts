@@ -64,7 +64,16 @@ export const settlementService = {
 };
 
 export const auditService = {
-  getLogs: (familyId: string) => api.get(`/audit/family/${familyId}`),
+  getLogs: (familyId: string, page = 0, size = 10, search = '') => {
+    const params = new URLSearchParams({
+      page: String(page),
+      size: String(size),
+    });
+    if (search.trim()) {
+      params.set('search', search.trim());
+    }
+    return api.get(`/audit/family/${familyId}?${params.toString()}`);
+  },
 };
 
 export const getErrorMessage = (error: any) => {

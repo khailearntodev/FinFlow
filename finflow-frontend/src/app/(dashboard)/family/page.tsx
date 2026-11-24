@@ -3,20 +3,18 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { familyService, getErrorMessage } from '@/services/api';
-import { 
-  Users, 
-  UserPlus, 
-  Shield, 
-  Mail, 
-  Trash2, 
+import {
+  UserPlus,
+  Shield,
+  Mail,
+  Trash2,
   UserMinus,
   Calendar,
   Settings,
-  Plus,
   Loader2,
-  CheckCircle2,
-  X
+  X,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/contexts/ToastContext';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -30,22 +28,27 @@ export default function FamilyPage() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [settingsForm, setSettingsForm] = useState({
     name: user?.family?.name || '',
-    billingDate: user?.family?.billingDate || 25
+    billingDate: user?.family?.billingDate || 25,
   });
 
   const [confirmDisband, setConfirmDisband] = useState(false);
-  const [confirmRemoveMember, setConfirmRemoveMember] = useState<{ email: string } | null>(null);
+  const [confirmRemoveMember, setConfirmRemoveMember] = useState<{
+    email: string;
+  } | null>(null);
   const [confirmUpdateSettings, setConfirmUpdateSettings] = useState(false);
 
   const handleAddMembers = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const emails = newMemberEmails.split(',').map(e => e.trim());
+      const emails = newMemberEmails
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
       await familyService.addMember({
         familyId: user.family.id,
         userEmail: emails,
-        adderEmail: user.email
+        adderEmail: user.email,
       });
       showToast('Đã thêm thành viên thành công!', 'success');
       setNewMemberEmails('');
@@ -64,7 +67,7 @@ export default function FamilyPage() {
       await familyService.revokeMember({
         familyId: user.family.id,
         userEmail: [confirmRemoveMember.email],
-        adderEmail: user.email
+        adderEmail: user.email,
       });
       showToast('Đã xóa thành viên thành công!', 'success');
       setConfirmRemoveMember(null);
@@ -97,7 +100,7 @@ export default function FamilyPage() {
         familyId: user.family.id,
         name: settingsForm.name,
         billingDate: settingsForm.billingDate,
-        requestEmail: user.email
+        requestEmail: user.email,
       });
       showToast('Cập nhật thiết lập thành công!', 'success');
       setConfirmUpdateSettings(false);
@@ -117,211 +120,342 @@ export default function FamilyPage() {
   const isHead = user.role === 'HEAD';
 
   return (
-    <div className="space-y-10">
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+      className="space-y-8"
+    >
       <header>
-        <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Quản lý gia đình</h1>
-        <p className="mt-2 text-slate-500 font-medium">Quản lý thành viên và thiết lập ngày chốt sổ.</p>
+        <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink">
+          Quản lý gia đình
+        </h1>
+        <p className="mt-1 text-sm text-muted">
+          Quản lý danh sách thành viên và chu kỳ chốt sổ hàng tháng.
+        </p>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        <div className="lg:col-span-2 space-y-8">
-          <section className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-black text-slate-900">Thành viên ({user.family.members.length})</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="lg:col-span-8 space-y-6">
+          {/* Members List */}
+          <section className="ff-surface shadow-card overflow-hidden">
+            <div className="px-6 py-5 border-b border-rule flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-display text-lg font-bold text-ink num">
+                Thành viên ({user.family.members.length})
+              </h2>
               {isHead && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold text-xs">
-                  <Shield className="h-4 w-4" />
-                  Bạn là Chủ hộ
-                </div>
+                <span className="inline-flex items-center gap-1.5 rounded-pill bg-accent-soft text-accent px-3 py-1 text-xs font-semibold">
+                  <Shield className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Bạn là Chủ hộ</span>
+                </span>
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <ul className="divide-y divide-rule">
               {user.family.members.map((member: any) => (
-                <div key={member.id} className="flex items-center justify-between p-6 rounded-3xl bg-slate-50 border border-slate-100 group transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1">
-                  <div className="flex items-center gap-4">
-                    <div className={cn(
-                      "h-12 w-12 rounded-2xl flex items-center justify-center font-black text-xl text-white shadow-lg",
-                      member.role === 'HEAD' ? "bg-amber-500 shadow-amber-200" : "bg-indigo-500 shadow-indigo-200"
-                    )}>
-                      {member.fullName.charAt(0)}
+                <li
+                  key={member.id}
+                  className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-paper-2/60 transition-colors"
+                >
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div
+                      className={cn(
+                        'h-10 w-10 shrink-0 rounded-input font-display font-bold text-sm flex items-center justify-center',
+                        member.role === 'HEAD'
+                          ? 'bg-accent text-accent-ink'
+                          : 'bg-paper-2 text-ink border border-rule'
+                      )}
+                    >
+                      {member.fullName.charAt(0).toUpperCase()}
                     </div>
-                    <div>
-                      <p className="font-bold text-slate-900">{member.fullName}</p>
-                      <p className="text-xs font-medium text-slate-500">{member.email}</p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-ink truncate">
+                          {member.fullName}
+                        </p>
+                        {member.role === 'HEAD' && (
+                          <span className="inline-flex rounded-pill bg-paper-3 text-ink-2 px-2 py-0.5 text-xs font-medium shrink-0">
+                            Chủ hộ
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted truncate mt-0.5">
+                        {member.email}
+                      </p>
                     </div>
                   </div>
+
                   {isHead && member.email !== user.email && (
-                    <button 
-                      onClick={() => setConfirmRemoveMember({ email: member.email })}
-                      className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                    <button
+                      type="button"
+                      aria-label={`Xóa thành viên ${member.fullName}`}
+                      onClick={() =>
+                        setConfirmRemoveMember({ email: member.email })
+                      }
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-input text-muted hover:text-error hover:bg-error-soft transition-colors"
                     >
-                      <UserMinus className="h-5 w-5" />
+                      <UserMinus className="h-4 w-4" aria-hidden="true" />
                     </button>
                   )}
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           </section>
 
+          {/* Invite Members Form (Head only) */}
           {isHead && (
-            <section className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="h-12 w-12 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600">
-                  <UserPlus className="h-6 w-6" />
+            <section className="ff-surface shadow-card p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-input bg-accent-soft text-accent">
+                  <UserPlus className="h-5 w-5" aria-hidden="true" />
                 </div>
-                <h2 className="text-2xl font-black text-slate-900">Mời thành viên</h2>
+                <div>
+                  <h2 className="font-display text-lg font-bold text-ink">
+                    Mời thành viên mới
+                  </h2>
+                  <p className="text-xs text-muted">
+                    Thêm thành viên đã đăng ký tài khoản bằng địa chỉ email.
+                  </p>
+                </div>
               </div>
 
-              <form onSubmit={handleAddMembers} className="space-y-6">
+              <form onSubmit={handleAddMembers} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-black text-slate-400 uppercase tracking-widest mb-2">Email thành viên</label>
+                  <label
+                    htmlFor="invite-emails"
+                    className="block text-sm font-medium text-ink-2 mb-1.5"
+                  >
+                    Email thành viên
+                  </label>
                   <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                    <input 
-                      type="text" 
-                      placeholder="email1@gmail.com, email2@gmail.com..." 
+                    <Mail
+                      className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted"
+                      aria-hidden="true"
+                    />
+                    <input
+                      id="invite-emails"
+                      type="text"
+                      placeholder="email1@gmail.com, email2@gmail.com..."
                       value={newMemberEmails}
                       onChange={(e) => setNewMemberEmails(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-medium"
+                      className="ff-input pl-10"
                     />
                   </div>
-                  <p className="mt-2 text-xs text-slate-400 font-medium">Phân tách nhiều email bằng dấu phẩy.</p>
+                  <p className="mt-1.5 text-xs text-muted">
+                    Phân tách nhiều địa chỉ email bằng dấu phẩy.
+                  </p>
                 </div>
 
-                <button 
-                  disabled={loading || !newMemberEmails}
-                  className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-8 py-4 font-bold text-white shadow-xl shadow-emerald-200 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50"
+                <button
+                  type="submit"
+                  disabled={loading || !newMemberEmails.trim()}
+                  className="ff-btn-primary"
                 >
-                  {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Gửi lời mời'}
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                      <span>Đang thêm…</span>
+                    </>
+                  ) : (
+                    'Gửi lời mời'
+                  )}
                 </button>
               </form>
             </section>
           )}
         </div>
 
-        <div className="space-y-8">
-          <section className="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl text-white">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center text-white">
-                <Settings className="h-6 w-6" />
-              </div>
-              <h2 className="text-2xl font-black">Thiết lập</h2>
+        {/* Right Family Settings Panel */}
+        <aside className="lg:col-span-4 ff-ink-panel p-6 space-y-6">
+          <div className="flex items-center gap-3">
+            <Settings className="h-5 w-5 text-accent-soft" aria-hidden="true" />
+            <h2 className="font-display text-lg font-bold text-paper">
+              Thiết lập gia đình
+            </h2>
+          </div>
+
+          <div className="rounded-input bg-ink-band-2 border border-ink-band-rule p-5">
+            <div className="flex items-center gap-2 text-xs font-medium text-ink-band-muted">
+              <Calendar className="h-4 w-4 text-accent-soft" aria-hidden="true" />
+              <span>Ngày chốt sổ định kỳ</span>
             </div>
+            <p className="mt-2 font-display text-3xl font-bold text-paper num">
+              Ngày {user.family.billingDate}
+            </p>
+            <p className="mt-1.5 text-xs text-ink-band-muted leading-relaxed">
+              Hệ thống tự động tổng hợp công nợ vào ngày này mỗi tháng.
+            </p>
+          </div>
 
-            <div className="space-y-6">
-              <div className="p-6 bg-white/5 rounded-2xl border border-white/10">
-                <div className="flex items-center gap-3 mb-4">
-                  <Calendar className="h-5 w-5 text-indigo-400" />
-                  <p className="font-bold text-slate-300 uppercase text-xs tracking-widest">Ngày chốt sổ</p>
-                </div>
-                <p className="text-4xl font-black">Ngày {user.family.billingDate}</p>
-                <p className="mt-2 text-xs text-slate-500 font-medium italic">Hệ thống sẽ tự động tổng hợp vào ngày này hàng tháng.</p>
-              </div>
+          {isHead && (
+            <button
+              type="button"
+              onClick={() => {
+                setSettingsForm({
+                  name: user.family.name,
+                  billingDate: user.family.billingDate,
+                });
+                setIsSettingsModalOpen(true);
+              }}
+              className="w-full min-h-[44px] rounded-input bg-paper px-4 py-2.5 text-sm font-semibold text-ink hover:bg-paper-2 whitespace-nowrap transition-colors"
+            >
+              Thay đổi thiết lập
+            </button>
+          )}
 
-              {isHead && (
-                <button 
-                  onClick={() => {
-                    setSettingsForm({
-                      name: user.family.name,
-                      billingDate: user.family.billingDate
-                    });
-                    setIsSettingsModalOpen(true);
-                  }}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-white/10 border border-white/20 py-4 font-bold hover:bg-white/20 transition-all"
-                >
-                  Thay đổi thiết lập
-                </button>
-              )}
+          <div className="pt-5 border-t border-ink-band-rule space-y-2">
+            <p className="text-xs font-medium text-ink-band-muted">
+              Thông tin nhóm
+            </p>
+            <p className="font-display text-base font-bold text-paper">
+              {user.family.name}
+            </p>
+            <p className="font-outlier text-xs text-ink-band-muted break-all">
+              ID: {user.family.id}
+            </p>
+          </div>
 
-              <div className="pt-6 border-t border-white/10">
-                <p className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">Thông tin gia đình</p>
-                <div className="space-y-2">
-                  <p className="text-lg font-black">{user.family.name}</p>
-                  <p className="text-sm text-slate-400">ID: {user.family.id}</p>
-                </div>
-              </div>
-
-              {isHead && (
-                <button 
-                  onClick={() => setConfirmDisband(true)}
-                  className="w-full mt-10 flex items-center justify-center gap-2 text-rose-500 font-bold hover:bg-rose-500/10 py-3 rounded-xl transition-all"
-                >
-                  <Trash2 className="h-5 w-5" />
-                  Giải tán gia đình
-                </button>
-              )}
-            </div>
-          </section>
-        </div>
-      </div>
-      {isSettingsModalOpen && (
-        <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/60 backdrop-blur-sm p-4 flex items-start md:items-center justify-center">
-          <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300 my-auto">
-            <div className="bg-indigo-600 px-8 py-6 flex items-center justify-between text-white">
-              <h2 className="text-2xl font-black">Thiết lập gia đình</h2>
-              <button onClick={() => setIsSettingsModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
-                <X className="h-6 w-6" />
+          {isHead && (
+            <div className="pt-4 border-t border-ink-band-rule">
+              <button
+                type="button"
+                onClick={() => setConfirmDisband(true)}
+                className="w-full inline-flex items-center justify-center gap-2 min-h-[44px] rounded-input bg-error-soft/15 border border-error/40 text-error-soft hover:bg-error hover:text-accent-ink text-sm font-semibold whitespace-nowrap transition-colors"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                <span>Giải tán gia đình</span>
               </button>
             </div>
- 
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              setConfirmUpdateSettings(true);
-            }} className="p-8 space-y-6">
-              <div>
-                <label className="block text-sm font-black text-slate-400 uppercase tracking-widest mb-2">Tên gia đình</label>
-                <input 
-                  required
-                  type="text" 
-                  value={settingsForm.name}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, name: e.target.value })}
-                  className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-bold text-lg"
-                />
-              </div>
- 
-              <div>
-                <label className="block text-sm font-black text-slate-400 uppercase tracking-widest mb-4 text-center">Ngày chốt sổ hàng tháng (1 - 28)</label>
-                <div className="grid grid-cols-7 gap-2">
-                  {Array.from({ length: 28 }, (_, i) => i + 1).map((date) => (
-                    <button
-                      key={date}
-                      type="button"
-                      onClick={() => setSettingsForm({ ...settingsForm, billingDate: date })}
-                      className={cn(
-                        "py-2 rounded-xl font-black text-sm transition-all",
-                        settingsForm.billingDate === date
-                          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
-                          : "bg-slate-50 text-slate-400 hover:bg-slate-100"
-                      )}
-                    >
-                      {date}
-                    </button>
-                  ))}
-                </div>
-              </div>
- 
-              <div className="pt-4 flex gap-4">
+          )}
+        </aside>
+      </div>
+
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {isSettingsModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-[400] overflow-y-auto bg-ink/45 p-4 flex items-start md:items-center justify-center"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.98 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="family-settings-title"
+              className="w-full max-w-lg rounded-card bg-surface border border-rule shadow-lift overflow-hidden my-auto"
+            >
+              <div className="px-6 py-5 border-b border-rule flex items-center justify-between bg-paper-2/60">
+                <h2 id="family-settings-title" className="font-display text-xl font-bold text-ink">
+                  Cập nhật thiết lập gia đình
+                </h2>
                 <button
                   type="button"
                   onClick={() => setIsSettingsModalOpen(false)}
-                  className="flex-1 px-6 py-4 rounded-2xl bg-slate-100 font-bold text-slate-600 hover:bg-slate-200 transition-all"
+                  aria-label="Đóng hộp thoại"
+                  className="flex h-9 w-9 items-center justify-center rounded-input text-muted hover:bg-paper-3 hover:text-ink transition-colors"
                 >
-                  Hủy
-                </button>
-                <button
-                  disabled={loading || !settingsForm.name}
-                  type="submit"
-                  className="flex-[2] flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-indigo-600 font-bold text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-50"
-                >
-                  {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Lưu thiết lập'}
+                  <X className="h-5 w-5" aria-hidden="true" />
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {/* Các Modal xác nhận */}
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setConfirmUpdateSettings(true);
+                }}
+                className="p-6 space-y-5"
+              >
+                <div>
+                  <label
+                    htmlFor="settings-family-name"
+                    className="block text-sm font-medium text-ink-2 mb-1.5"
+                  >
+                    Tên gia đình
+                  </label>
+                  <input
+                    id="settings-family-name"
+                    required
+                    type="text"
+                    value={settingsForm.name}
+                    onChange={(e) =>
+                      setSettingsForm({ ...settingsForm, name: e.target.value })
+                    }
+                    className="ff-input font-medium"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-ink-2">
+                      Ngày chốt sổ hàng tháng (1 đến 28)
+                    </label>
+                    <span className="font-outlier text-sm font-medium text-accent num">
+                      Ngày {settingsForm.billingDate}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-7 gap-2">
+                    {Array.from({ length: 28 }, (_, i) => i + 1).map((date) => {
+                      const active = settingsForm.billingDate === date;
+                      return (
+                        <button
+                          key={date}
+                          type="button"
+                          onClick={() =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              billingDate: date,
+                            })
+                          }
+                          className={cn(
+                            'h-10 rounded-input font-outlier text-sm font-medium num transition-colors',
+                            active
+                              ? 'bg-accent text-accent-ink border border-accent-deep'
+                              : 'bg-paper-2 text-ink-2 border border-transparent hover:border-rule-strong hover:text-ink'
+                          )}
+                        >
+                          {date}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-rule flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsSettingsModalOpen(false)}
+                    className="ff-btn-secondary w-full sm:w-auto"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    disabled={loading || !settingsForm.name.trim()}
+                    type="submit"
+                    className="ff-btn-primary w-full sm:w-auto"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                        <span>Đang lưu…</span>
+                      </>
+                    ) : (
+                      'Lưu thiết lập'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirmation Modals */}
       <ConfirmModal
         isOpen={confirmDisband}
         onClose={() => setConfirmDisband(false)}
@@ -352,7 +486,6 @@ export default function FamilyPage() {
         type="info"
         isLoading={loading}
       />
-    </div>
+    </motion.div>
   );
 }
-

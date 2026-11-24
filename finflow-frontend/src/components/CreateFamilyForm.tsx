@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { familyService, getErrorMessage } from '@/services/api';
 import { Plus, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/contexts/ToastContext';
@@ -28,11 +29,11 @@ export const CreateFamilyForm = ({ onSuccess, redirectOnSuccess }: CreateFamilyF
       await familyService.create({
         name,
         billingDate: parseInt(billingDate),
-        creatorEmail: user.email
+        creatorEmail: user.email,
       });
       await refreshUser();
       showToast('Tạo gia đình thành công!', 'success');
-      
+
       if (onSuccess) onSuccess();
       if (redirectOnSuccess) router.push(redirectOnSuccess);
     } catch (error: any) {
@@ -43,59 +44,94 @@ export const CreateFamilyForm = ({ onSuccess, redirectOnSuccess }: CreateFamilyF
   };
 
   return (
-    <div className="max-w-2xl mx-auto py-10">
-      <div className="bg-white rounded-[3rem] p-12 shadow-2xl border border-slate-100">
-        <div className="text-center mb-10">
-          <div className="mx-auto h-20 w-20 rounded-3xl bg-indigo-600 flex items-center justify-center text-white mb-6 shadow-xl shadow-indigo-200">
-            <Plus className="h-10 w-10" />
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+      className="max-w-xl mx-auto py-4 sm:py-8"
+    >
+      <div className="ff-surface p-6 sm:p-10 shadow-card">
+        <header className="mb-8">
+          <div className="inline-flex h-11 w-11 items-center justify-center rounded-input bg-accent-soft text-accent mb-4">
+            <Plus className="h-5 w-5" aria-hidden="true" />
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Bắt đầu gia đình mới</h1>
-          <p className="mt-4 text-slate-500 font-medium text-lg">Tạo không gian chung để quản lý chi tiêu cùng mọi người.</p>
-        </div>
+          <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink">
+            Bắt đầu gia đình mới
+          </h1>
+          <p className="mt-2 text-sm text-muted">
+            Tạo không gian chung để quản lý chi tiêu và chốt sổ định kỳ cùng mọi người.
+          </p>
+        </header>
 
-        <form onSubmit={handleCreate} className="space-y-8">
+        <form onSubmit={handleCreate} className="space-y-6">
           <div>
-            <label className="block text-sm font-black text-slate-400 uppercase tracking-widest mb-3 text-center">Tên gia đình</label>
-            <input 
+            <label htmlFor="family-name" className="block text-sm font-medium text-ink-2 mb-2">
+              Tên gia đình
+            </label>
+            <input
+              id="family-name"
               required
-              type="text" 
+              type="text"
               placeholder="VD: Gia đình Hạnh Phúc, Căn hộ 402..."
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-8 py-5 rounded-[2rem] border-2 border-slate-100 focus:border-indigo-500 focus:ring-8 focus:ring-indigo-500/5 outline-none transition-all text-center text-2xl font-black placeholder:text-slate-200"
+              className="ff-input text-base font-medium"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-black text-slate-400 uppercase tracking-widest mb-3 text-center">Ngày chốt sổ hàng tháng (1 - 28)</label>
-            <div className="grid grid-cols-7 gap-2">
-              {Array.from({ length: 28 }, (_, i) => i + 1).map((date) => (
-                <button
-                  key={date}
-                  type="button"
-                  onClick={() => setBillingDate(date.toString())}
-                  className={cn(
-                    "py-3 rounded-xl font-black text-sm transition-all",
-                    billingDate === date.toString()
-                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200"
-                      : "bg-slate-50 text-slate-400 hover:bg-slate-100"
-                  )}
-                >
-                  {date}
-                </button>
-              ))}
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-ink-2">
+                Ngày chốt sổ hàng tháng (1 đến 28)
+              </label>
+              <span className="font-outlier text-sm font-medium text-accent num">
+                Ngày {billingDate}
+              </span>
             </div>
-            <p className="mt-4 text-center text-xs text-slate-400 font-medium italic">Vào ngày này, hệ thống sẽ tự động tổng hợp công nợ cho tất cả thành viên.</p>
+
+            <div className="grid grid-cols-7 gap-2" role="radiogroup" aria-label="Ngày chốt sổ hàng tháng">
+              {Array.from({ length: 28 }, (_, i) => i + 1).map((date) => {
+                const isSelected = billingDate === date.toString();
+                return (
+                  <button
+                    key={date}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    onClick={() => setBillingDate(date.toString())}
+                    className={cn(
+                      'h-10 rounded-input font-outlier text-sm font-medium num transition-colors',
+                      isSelected
+                        ? 'bg-accent text-accent-ink border border-accent-deep'
+                        : 'bg-paper-2 text-ink-2 border border-transparent hover:border-rule-strong hover:text-ink'
+                    )}
+                  >
+                    {date}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-xs text-muted">
+              Vào ngày này, hệ thống sẽ tự động tổng hợp công nợ cho tất cả thành viên.
+            </p>
           </div>
 
-          <button 
-            disabled={loading || !name}
-            className="w-full flex items-center justify-center gap-3 rounded-[2rem] bg-indigo-600 py-6 text-xl font-black text-white shadow-2xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
+          <button
+            type="submit"
+            disabled={loading || !name.trim()}
+            className="ff-btn-primary w-full"
           >
-            {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : 'Xác nhận tạo gia đình'}
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                <span>Đang khởi tạo…</span>
+              </>
+            ) : (
+              'Xác nhận tạo gia đình'
+            )}
           </button>
         </form>
       </div>
-    </div>
+    </motion.div>
   );
 };
