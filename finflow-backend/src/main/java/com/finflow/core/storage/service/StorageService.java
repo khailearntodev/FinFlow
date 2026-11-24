@@ -20,7 +20,7 @@ public class StorageService {
     public String uploadImage(MultipartFile file) {
         try {
             if (file.isEmpty()) {
-                throw new StorageException("File không tồn tại");
+                throw new StorageException("Ủa chọn file ảnh biên lai trước đi nha, trống trơn á!");
             }
 
             String publicId = "finflow_proof_" + UUID.randomUUID().toString();
@@ -33,7 +33,7 @@ public class StorageService {
 
             return uploadResult.get("secure_url").toString();
         } catch (Exception e) {
-            throw new StorageException("Lỗi khi upload file lên Cloud: " + e.getMessage());
+            throw new StorageException("Tải ảnh lên Cloud bị lỗi ngang ròi, thử lại nha: " + e.getMessage());
         }
     }
 

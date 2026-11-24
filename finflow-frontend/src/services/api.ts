@@ -24,6 +24,8 @@ export const authService = {
 
 export const userService = {
   getMe: (email: string) => api.get(`/user/me?email=${email}`),
+  updateProfile: (data: any) => api.put('/user/me', data),
+  changePassword: (data: any) => api.put('/user/password', data),
 };
 
 export const familyService = {
@@ -44,12 +46,15 @@ export const expenseService = {
     api.get(`/expense/export-excel?familyId=${familyId}&month=${month}&year=${year}`, {
       responseType: 'blob',
     }),
+  getAnalytics: (familyId: string, months = 6) =>
+    api.get(`/expense/analytics?familyId=${familyId}&months=${months}`),
 };
 
 export const settlementService = {
   create: (data: any) => api.post('/settlement/create', data),
   getSettlements: (familyId: string) => api.get(`/settlement/family/${familyId}`),
   getMyBills: (userId: string) => api.get(`/settlement/bills/user/${userId}`),
+  getBillBreakdown: (billId: string) => api.get(`/settlement/bills/${billId}/breakdown`),
   submitProof: (billId: string, email: string, file: File) => {
     const formData = new FormData();
     formData.append('email', email);

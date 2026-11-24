@@ -7,13 +7,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class BillDetail {
-    private java.util.UUID id;
+    private UUID id;
     private String userEmail;
     private String fullName;
     private BigDecimal amount;
@@ -21,4 +22,11 @@ public class BillDetail {
     private String proofImageUrl;
     private Integer month;
     private Integer year;
+
+    // VietQR transfer fields (Phase 3)
+    private String qrImageUrl;
+    private String recipientBankCode;
+    private String recipientAccountNumber;
+    private String recipientAccountName;
+    private String transferContent;
 }

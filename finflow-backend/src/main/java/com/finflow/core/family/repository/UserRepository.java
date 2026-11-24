@@ -16,5 +16,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     List<User> findByFamilyId(UUID familyId);
 
+    boolean existsByPhoneNumberAndIdNot(String phoneNumber, UUID id);
+
     Optional<User> findEmailById(UUID userId);
 }

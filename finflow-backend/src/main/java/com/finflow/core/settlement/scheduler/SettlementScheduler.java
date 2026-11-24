@@ -142,6 +142,13 @@ public class SettlementScheduler {
             LocalDate targetBillingDate
     ) {
         String formattedDate = targetBillingDate.format(DATE_FORMATTER);
+        String deepLink = emailService.buildSettlementLink(settleMonth, settleYear);
+        String ctaHtml = deepLink != null
+                ? String.format(
+                "<div style=\"margin:0 0 22px;\"><a href=\"%s\" style=\"display:inline-block;padding:12px 20px;background-color:#1b7352;color:#ffffff;text-decoration:none;border-radius:10px;font-size:14px;font-weight:600;\">Mở FinFlow kiểm tra sổ chi tiêu</a></div>",
+                deepLink
+        )
+                : "";
         return String.format(
                 "<!DOCTYPE html>" +
                 "<html lang=\"vi\"><body style=\"margin:0;padding:24px;background-color:#f6f5f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#172420;\">" +
@@ -166,6 +173,7 @@ public class SettlementScheduler {
                 "      <li>Nhắc các thành viên cập nhật hoặc chỉnh sửa khoản chi còn thiếu trước 00:00 ngày %s.</li>" +
                 "      <li>Sau thời điểm trên, các khoản chi sẽ tự động chuyển sang trạng thái <b>Đã chốt</b> và tạo hóa đơn công nợ.</li>" +
                 "    </ul>" +
+                "    %s" +
                 "    <p style=\"margin:0;padding-top:16px;border-top:1px solid #e5eae5;font-size:12px;color:#6c7f78;\">" +
                 "      Đây là email tự động từ hệ thống FinFlow. Nếu bạn đã chủ động chốt sổ sớm hơn, vui lòng bỏ qua thông báo này." +
                 "    </p>" +
@@ -179,17 +187,18 @@ public class SettlementScheduler {
                 settleMonth, settleYear,
                 formattedDate,
                 settleMonth, settleYear,
-                formattedDate
+                formattedDate,
+                ctaHtml
         );
     }
 
     private User getFamilyHead(Family family) {
         if (family.getMembers() == null || family.getMembers().isEmpty()) {
-            throw new SettlementException("Không tìm thấy danh sách thành viên của gia đình " + family.getName());
+            throw new SettlementException("Ủa nhà " + family.getName() + " hong thấy ai hết á!");
         }
         return family.getMembers().stream()
                 .filter(m -> m.getRole() == RoleEnum.HEAD)
                 .findFirst()
-                .orElseThrow(() -> new SettlementException("Không tìm thấy chủ hộ"));
+                .orElseThrow(() -> new SettlementException("Hong tìm thấy Chủ hộ của nhà này đâu ròi!"));
     }
 }

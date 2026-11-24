@@ -4,6 +4,8 @@ import com.finflow.core.enums.RoleEnum;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,6 +17,10 @@ public class UserProfileResponse {
     private String email;
     private String phoneNumber;
     private RoleEnum role;
+    private String bankCode;
+    private String bankAccountNumber;
+    private String bankAccountName;
+    private ZonedDateTime createdAt;
     private FamilyDetail family;
 
     @Data
@@ -23,6 +29,7 @@ public class UserProfileResponse {
         private UUID id;
         private String name;
         private Integer billingDate;
+        private BigDecimal monthlyBudget;
         private List<MemberDetail> members;
     }
 

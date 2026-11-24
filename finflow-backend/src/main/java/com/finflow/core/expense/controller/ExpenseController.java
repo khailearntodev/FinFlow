@@ -1,5 +1,6 @@
 package com.finflow.core.expense.controller;
 
+import com.finflow.core.expense.dto.ExpenseAnalyticsResponse;
 import com.finflow.core.expense.dto.ExpenseCreateRequest;
 import com.finflow.core.expense.dto.ExpenseResponse;
 import com.finflow.core.expense.service.ExpenseService;
@@ -68,5 +69,12 @@ public class ExpenseController {
         return ResponseEntity.ok()
                 .headers(headers)
                 .body(excelData);
+    }
+
+    @GetMapping("/analytics")
+    public ResponseEntity<ExpenseAnalyticsResponse> getAnalytics(
+            @RequestParam("familyId") UUID familyId,
+            @RequestParam(value = "months", defaultValue = "6") int months) {
+        return ResponseEntity.ok(expenseService.getAnalytics(familyId, months));
     }
 }

@@ -6,43 +6,36 @@ import com.finflow.core.enums.SettlementBillStatusEnum;
 import com.finflow.core.enums.SettlementStatusEnum;
 import com.finflow.core.exception.ExpenseException;
 import com.finflow.core.exception.SettlementException;
-import com.finflow.core.exception.StorageException;
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Collectors;
 import com.finflow.core.expense.domain.Expense;
-import com.finflow.core.expense.domain.ExpenseParticipant;
-import com.finflow.core.expense.dto.ExpenseResponse;
 import com.finflow.core.expense.repository.ExpenseRepository;
-import com.finflow.core.expense.service.ExpenseService;
 import com.finflow.core.family.domain.Family;
 import com.finflow.core.family.domain.User;
 import com.finflow.core.family.repository.FamilyRepository;
 import com.finflow.core.family.repository.UserRepository;
+import com.finflow.core.notification.service.EmailService;
 import com.finflow.core.settlement.domain.Settlement;
 import com.finflow.core.settlement.domain.SettlementBill;
+import com.finflow.core.settlement.dto.BillBreakdownResponse;
 import com.finflow.core.settlement.dto.BillDetail;
 import com.finflow.core.settlement.dto.SettlementCreateRequest;
 import com.finflow.core.settlement.dto.SettlementResponse;
 import com.finflow.core.settlement.repository.SettlementBillRepository;
 import com.finflow.core.settlement.repository.SettlementRepository;
+import com.finflow.core.settlement.util.ExpenseShareCalculator;
+import com.finflow.core.settlement.util.VietQrBuilder;
 import com.finflow.core.storage.service.StorageService;
-import com.finflow.core.notification.service.EmailService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.*;
-
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -58,30 +51,32 @@ public class SettlementService {
 
     private final Map<UUID, LocalDateTime> lastRemindedMap = new ConcurrentHashMap<>();
 
+    @Value("${finflow.settlement.remind-cooldown-minutes:60}")
+    private long remindCooldownMinutes = 60;
+
     @Transactional
     public SettlementResponse createSettlement(SettlementCreateRequest settlementCreateRequest) {
         User holdFamily = userRepository.findByEmail(settlementCreateRequest.getHoldEmail())
                 .orElseThrow(
-                        () -> new SettlementException("Không tìm thấy người tạo yêu cầu kết sổ"));
+                        () -> new SettlementException("Hong tìm thấy người tạo yêu cầu chốt sổ đâu ròi!"));
 
         Family family = familyRepository.findById(UUID.fromString(settlementCreateRequest.getFamilyId())).orElseThrow(
-                () -> new SettlementException("Không tìm thấy gia đình"));
+                () -> new SettlementException("Hong thấy gia đình này đâu hết á!"));
 
         boolean isFamilyHead = family.getMembers().contains(holdFamily);
         if (!isFamilyHead || holdFamily.getRole() == RoleEnum.USER) {
-            throw new ExpenseException("Chỉ chủ hộ của gia đình mới được tạo Kết sổ");
+            throw new ExpenseException("Chỉ Chủ hộ mới được bấm chốt sổ nha!");
         }
 
         if (settlementRepository.findByFamilyIdAndMonthAndYear(family.getId(), settlementCreateRequest.getMonth(),
                 settlementCreateRequest.getYear()).isPresent()) {
-            throw new SettlementException("Tháng này đã được chốt sổ rồi!");
+            throw new SettlementException("Tháng này chốt sổ mất tiêu ròi, khỏi bấm lại nha!");
         }
 
         List<Expense> pendingExpenses = expenseRepository.findByFamilyId(family.getId())
                 .stream()
                 .filter(e -> e.getStatus() == ExpenseStatus.PENDING)
                 .filter(e -> {
-                    // Chốt sổ cho tháng T, năm Y sẽ bao gồm các khoản chi từ tháng T trở về trước
                     if (e.getExpenseDate().getYear() < settlementCreateRequest.getYear())
                         return true;
                     if (e.getExpenseDate().getYear() == settlementCreateRequest.getYear()) {
@@ -92,11 +87,11 @@ public class SettlementService {
                 .toList();
 
         if (pendingExpenses.isEmpty()) {
-            throw new SettlementException("Không có khoản chi nào cần kết sổ");
+            throw new SettlementException("Tháng này chưa có khoản chi nào hết á, có gì đâu mà chốt sổ nha!");
         }
 
-        Map<UUID, BigDecimal> paidMap = new HashMap<UUID, BigDecimal>();
-        Map<UUID, BigDecimal> owedMap = new HashMap<UUID, BigDecimal>();
+        Map<UUID, BigDecimal> paidMap = new HashMap<>();
+        Map<UUID, BigDecimal> owedMap = new HashMap<>();
 
         for (User user : family.getMembers()) {
             paidMap.put(user.getId(), BigDecimal.ZERO);
@@ -104,33 +99,15 @@ public class SettlementService {
         }
 
         for (Expense expense : pendingExpenses) {
-            // 1. Người nào trả tiền thì cộng vào ví paidMap
             UUID payerId = UUID.fromString(expense.getPaidByUserId());
-            paidMap.put(payerId, paidMap.get(payerId).add(expense.getAmount()));
+            paidMap.put(payerId, paidMap.getOrDefault(payerId, BigDecimal.ZERO).add(expense.getAmount()));
 
-            // 2. Chia nợ đều cho những người tham gia (bao gồm người chi trả)
-            int participantCount = expense.getParticipants().size();
-            BigDecimal shareAmount = expense.getAmount().divide(BigDecimal.valueOf(participantCount), 2,
-                    RoundingMode.HALF_UP);
-
-            // 3. xử lý tiền lẻ
-            BigDecimal totalShared = shareAmount.multiply(BigDecimal.valueOf(participantCount));
-            BigDecimal remainder = expense.getAmount().subtract(totalShared);
-
-            // 4. Phân bổ tiền
-            boolean remainderAssigned = false;
-            for (ExpenseParticipant participant : expense.getParticipants()) {
-                UUID pID = participant.getId().getUserId();
-                BigDecimal amountToOwe = shareAmount;
-                if (!remainderAssigned && remainder.compareTo(BigDecimal.ZERO) != 0) {
-                    amountToOwe = amountToOwe.add(remainder);
-                    remainderAssigned = true;
-                }
-                owedMap.put(pID, owedMap.get(pID).add(amountToOwe));
+            Map<UUID, BigDecimal> shares = ExpenseShareCalculator.calculateShares(expense);
+            for (Map.Entry<UUID, BigDecimal> entry : shares.entrySet()) {
+                owedMap.put(entry.getKey(), owedMap.getOrDefault(entry.getKey(), BigDecimal.ZERO).add(entry.getValue()));
             }
         }
 
-        // 5. tạo chốt sổ tháng
         Settlement settlement = Settlement.builder()
                 .familyId(UUID.fromString(settlementCreateRequest.getFamilyId()))
                 .month(settlementCreateRequest.getMonth())
@@ -140,15 +117,12 @@ public class SettlementService {
 
         settlementRepository.save(settlement);
 
-        // 6. Tính công nợ cuối cùng
         List<SettlementBill> billsToSave = new ArrayList<>();
         List<BillDetail> billDetails = new ArrayList<>();
         BigDecimal totalVerification = BigDecimal.ZERO;
 
         for (User member : family.getMembers()) {
             UUID memberId = member.getId();
-
-            // tiền cuối cùng = số phải trả (mắc nợ) - số đã chi
             BigDecimal netAmount = owedMap.get(memberId).subtract(paidMap.get(memberId));
             totalVerification = totalVerification.add(netAmount);
 
@@ -160,21 +134,12 @@ public class SettlementService {
                     .build();
 
             billsToSave.add(bill);
-
-            billDetails.add(BillDetail.builder()
-                    .userEmail(member.getEmail())
-                    .fullName(member.getFullName())
-                    .amount(netAmount)
-                    .status(SettlementBillStatusEnum.PENDING)
-                    .build());
         }
 
-        // 7. Kiểm tra dòng tiền đúng chưa
         if (totalVerification.compareTo(BigDecimal.ZERO) != 0) {
-            throw new SettlementException("Dòng tiền bị thất thoát");
+            throw new SettlementException("Ủa bịp nha, tiền tính ra bị lệch ròi, kiểm tra lại liền đi!");
         }
 
-        // 8. lưu dữ liệu
         settlementBillRepository.saveAll(billsToSave);
         for (Expense expense : pendingExpenses) {
             expense.setStatus(ExpenseStatus.SETTLED);
@@ -182,10 +147,17 @@ public class SettlementService {
         }
         expenseRepository.saveAll(pendingExpenses);
 
-        // 8.5. Gửi email thông báo cho tất cả thành viên
-        notifyFamilyMembersOfSettlement(family, settlement, billsToSave);
+        Map<UUID, User> membersMap = family.getMembers().stream()
+                .collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a));
 
-        // 9. trả về cho fe
+        for (SettlementBill savedBill : billsToSave) {
+            User member = membersMap.get(savedBill.getUserId());
+            billDetails.add(buildBillDetail(savedBill, member, holdFamily, settlement.getMonth(), settlement.getYear()));
+        }
+
+        // Gửi email bất đồng bộ sau khi DB commit
+        notifyFamilyMembersOfSettlement(family, holdFamily, settlement, billsToSave);
+
         return SettlementResponse.builder()
                 .settlementId(settlement.getId().toString())
                 .month(settlement.getMonth())
@@ -196,65 +168,76 @@ public class SettlementService {
                 .build();
     }
 
-    private void notifyFamilyMembersOfSettlement(Family family, Settlement settlement, List<SettlementBill> bills) {
-        String subject = "🔔 Thông báo: Kỳ chốt sổ tháng " + settlement.getMonth() + "/" + settlement.getYear() + " đã được tạo";
-        
+    private void notifyFamilyMembersOfSettlement(Family family, User head, Settlement settlement, List<SettlementBill> bills) {
+        String subject = "FinFlow | Kỳ chốt sổ tháng " + settlement.getMonth() + "/" + settlement.getYear() + " đã được tạo";
+        String deepLink = emailService.buildSettlementLink(settlement.getMonth(), settlement.getYear());
+        String ctaHtml = buildDeepLinkButtonHtml(deepLink, "Xem chi tiết công nợ trên FinFlow");
+
         for (User member : family.getMembers()) {
             SettlementBill memberBill = bills.stream()
                     .filter(b -> b.getUserId().equals(member.getId()))
                     .findFirst().orElse(null);
-                    
+
             if (memberBill == null) continue;
-            
-            String amountInfo = "";
+
+            String amountInfo;
+            String qrHtml = "";
             if (memberBill.getAmount().compareTo(BigDecimal.ZERO) > 0) {
-                amountInfo = "<p>Bạn cần thanh toán: <b style=\"color: red;\">" + String.format("%,.0f", memberBill.getAmount()) + " VND</b></p>";
+                amountInfo = "<p>Bạn cần thanh toán: <b style=\"color:#b42318;\">" + String.format("%,.0f", memberBill.getAmount()) + " VND</b></p>";
+                String memo = VietQrBuilder.buildTransferContent(settlement.getMonth(), settlement.getYear(), member.getFullName(), false);
+                String emailQrUrl = VietQrBuilder.buildEmailQrUrl(
+                        head.getBankCode(), head.getBankAccountNumber(), head.getBankAccountName(), memberBill.getAmount(), memo
+                );
+                if (emailQrUrl != null) {
+                    qrHtml = buildEmailQrBlockHtml(emailQrUrl, head, memo);
+                }
             } else if (memberBill.getAmount().compareTo(BigDecimal.ZERO) < 0) {
-                amountInfo = "<p>Bạn sẽ nhận lại: <b style=\"color: green;\">" + String.format("%,.0f", memberBill.getAmount().abs()) + " VND</b></p>";
+                amountInfo = "<p>Bạn sẽ nhận lại: <b style=\"color:#1b7352;\">" + String.format("%,.0f", memberBill.getAmount().abs()) + " VND</b></p>";
             } else {
                 amountInfo = "<p>Bạn đã hoàn tất công nợ kỳ này (0 VND).</p>";
             }
 
             String body = String.format(
-                    "<html>" +
-                            "<body>" +
+                    "<html><body style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#172420;line-height:1.6;\">" +
                             "<h2>Kỳ chốt sổ mới đã được tạo</h2>" +
                             "<p>Chào <b>%s</b>,</p>" +
                             "<p>Chủ hộ đã tạo kỳ chốt sổ cho tháng <b>%d/%d</b>.</p>" +
                             "%s" +
-                            "<p>Vui lòng đăng nhập vào hệ thống FinFlow để xem chi tiết và nộp minh chứng thanh toán nếu cần.</p>" +
-                            "<hr/>" +
-                            "<p><i>Đây là email tự động từ hệ thống FinFlow.</i></p>" +
-                            "</body>" +
-                            "</html>",
+                            "%s" +
+                            "<p>Vui lòng mở FinFlow để xem bảng kê chi tiết và nộp minh chứng thanh toán nếu cần.</p>" +
+                            "%s" +
+                            "<hr/><p style=\"font-size:12px;color:#6c7f78;\"><i>Đây là email tự động từ hệ thống FinFlow.</i></p>" +
+                            "</body></html>",
                     member.getFullName(),
                     settlement.getMonth(),
                     settlement.getYear(),
-                    amountInfo
+                    amountInfo,
+                    qrHtml,
+                    ctaHtml
             );
 
-            emailService.sendEmail(member.getEmail(), subject, body);
+            emailService.sendEmailAfterCommit(member.getEmail(), subject, body);
         }
     }
 
     @Transactional
     public String submitPaymentProof(UUID billId, String userEmail, MultipartFile proofFile) {
         User user = userRepository.findByEmail(userEmail).orElseThrow(
-                () -> new SettlementException("Không tìm thấy người dùng"));
+                () -> new SettlementException("Hong tìm thấy tài khoản của bạn đâu ròi!"));
 
-        SettlementBill bill = settlementBillRepository.findById(billId).orElseThrow(
-                () -> new SettlementException("Không tìm thấy hóa đơn"));
+        SettlementBill bill = settlementBillRepository.findWithSettlementById(billId).orElseThrow(
+                () -> new SettlementException("Hong thấy hóa đơn này đâu hết á!"));
 
         if (bill.getStatus() != SettlementBillStatusEnum.PENDING) {
-            throw new SettlementException("Hóa đơn không hợp lệ, vui lòng chọn đúng hóa đơn tháng này");
+            throw new SettlementException("Hóa đơn này xử lý ròi hoặc hong hợp lệ á, chọn đúng hóa đơn tháng này nha!");
         }
 
         if (user.getFamily() == null || !user.getFamily().getId().equals(bill.getSettlement().getFamilyId())) {
-            throw new SettlementException("Hóa đơn phải thuộc về gia đình này");
+            throw new SettlementException("Bịp nha, hóa đơn này đâu phải của nhà mình!");
         }
 
         if (!user.getId().equals(bill.getUserId())) {
-            throw new SettlementException("Bạn chỉ có thể nộp minh chứng cho chính mình");
+            throw new SettlementException("Ai nấy nộp biên lai của mình thôi nha, hong nộp giùm được á!");
         }
 
         String proofUrl = storageService.uploadImage(proofFile);
@@ -273,50 +256,53 @@ public class SettlementService {
         if (family == null)
             return;
 
-        String subject = "🔔 Thông báo: Thành viên " + payer.getFullName() + " đã nộp minh chứng thanh toán";
+        int month = bill.getSettlement().getMonth();
+        int year = bill.getSettlement().getYear();
+        String deepLink = emailService.buildSettlementLink(month, year);
+        String ctaHtml = buildDeepLinkButtonHtml(deepLink, "Kiểm tra và xác nhận trên FinFlow");
+
+        String subject = "FinFlow | Thành viên " + payer.getFullName() + " đã nộp minh chứng thanh toán";
         String body = String.format(
-                "<html>" +
-                        "<body>" +
+                "<html><body style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#172420;line-height:1.6;\">" +
                         "<h2>Thông báo nộp minh chứng thanh toán</h2>" +
                         "<p>Thành viên <b>%s</b> đã nộp minh chứng thanh toán cho kỳ chốt sổ tháng <b>%d/%d</b>.</p>" +
                         "<p>Số tiền: <b>%,.0f VND</b></p>" +
                         "<p>Trạng thái hóa đơn: <b>Đang chờ xác nhận</b></p>" +
-                        "<p>Vui lòng đăng nhập vào hệ thống FinFlow để kiểm tra.</p>" +
-                        "<hr/>" +
-                        "<p><i>Đây là email tự động từ hệ thống FinFlow.</i></p>" +
-                        "</body>" +
-                        "</html>",
+                        "%s" +
+                        "<hr/><p style=\"font-size:12px;color:#6c7f78;\"><i>Đây là email tự động từ hệ thống FinFlow.</i></p>" +
+                        "</body></html>",
                 payer.getFullName(),
-                bill.getSettlement().getMonth(),
-                bill.getSettlement().getYear(),
-                bill.getAmount().abs());
+                month,
+                year,
+                bill.getAmount().abs(),
+                ctaHtml);
 
         family.getMembers().stream()
                 .filter(member -> !member.getId().equals(payer.getId()))
-                .forEach(member -> emailService.sendEmail(member.getEmail(), subject, body));
+                .forEach(member -> emailService.sendEmailAfterCommit(member.getEmail(), subject, body));
     }
 
     @Transactional
     public String confirmPayment(UUID billId, String headEmail) {
         User head = userRepository.findByEmail(headEmail).orElseThrow(
-                () -> new SettlementException("Không tìm thấy chủ hộ"));
+                () -> new SettlementException("Hong tìm thấy Chủ hộ đâu ròi!"));
 
-        SettlementBill bill = settlementBillRepository.findById(billId).orElseThrow(
-                () -> new SettlementException("Không tìm thấy hóa đơn!"));
+        SettlementBill bill = settlementBillRepository.findWithSettlementById(billId).orElseThrow(
+                () -> new SettlementException("Hong thấy hóa đơn này đâu hết á!"));
 
         Settlement settlement = bill.getSettlement();
 
         if (head.getRole() != RoleEnum.HEAD || !head.getFamily().getId().equals(bill.getSettlement().getFamilyId())) {
-            throw new SettlementException("Chỉ có chủ hộ mới có quyền xác nhận thanh toán");
+            throw new SettlementException("Chỉ Chủ hộ mới được duyệt thanh toán nha!");
         }
 
         if (bill.getStatus() == SettlementBillStatusEnum.COMPLETED) {
-            throw new SettlementException("Hóa đơn này đã được xác nhận trước đó");
+            throw new SettlementException("Hóa đơn này duyệt ok ròi, khỏi bấm nữa nha!");
         }
 
         if (bill.getStatus() == SettlementBillStatusEnum.PENDING && bill.getAmount().compareTo(BigDecimal.ZERO) >= 0) {
             if (!bill.getUserId().equals(head.getId())) {
-                throw new SettlementException("Hóa đơn này chưa được nộp minh chứng thanh toán");
+                throw new SettlementException("Khoan nha, người ta chưa nộp biên lai chuyển khoản á!");
             }
         }
 
@@ -336,10 +322,15 @@ public class SettlementService {
     public List<SettlementResponse> getSettlementsByFamilyId(UUID familyId) {
         List<Settlement> allSettlements = settlementRepository.findByFamilyId(familyId);
 
-        // Fetch all family members in one query to avoid N+1 and extra family lookup
-        Map<UUID, User> membersMap = userRepository.findByFamilyId(familyId).stream()
+        List<User> members = userRepository.findByFamilyId(familyId);
+        Map<UUID, User> membersMap = members.stream()
                 .collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a));
-        
+
+        User headUser = members.stream()
+                .filter(u -> u.getRole() == RoleEnum.HEAD)
+                .findFirst()
+                .orElse(null);
+
         Map<String, Settlement> bestSettlements = new HashMap<>();
         for (Settlement s : allSettlements) {
             String key = s.getMonth() + "-" + s.getYear();
@@ -367,17 +358,7 @@ public class SettlementService {
                         .status(s.getStatus())
                         .createdAt(s.getCreatedAt())
                         .bills(s.getSettlementBills().stream()
-                                .map(b -> {
-                                    User user = membersMap.get(b.getUserId());
-                                    return BillDetail.builder()
-                                            .id(b.getId())
-                                            .userEmail(user != null ? user.getEmail() : "N/A")
-                                            .fullName(user != null ? user.getFullName() : "N/A")
-                                            .amount(b.getAmount())
-                                            .status(b.getStatus())
-                                            .proofImageUrl(b.getProofImageUrl())
-                                            .build();
-                                })
+                                .map(b -> buildBillDetail(b, membersMap.get(b.getUserId()), headUser, s.getMonth(), s.getYear()))
                                 .toList())
                         .build())
                 .toList();
@@ -387,44 +368,102 @@ public class SettlementService {
     public List<BillDetail> getBillsByUserId(UUID userId) {
         User user = userRepository.findById(userId).orElse(null);
         return settlementBillRepository.findByUserId(userId).stream()
-                .map(b -> {
-                    return BillDetail.builder()
-                            .id(b.getId())
-                            .userEmail(user != null ? user.getEmail() : "N/A")
-                            .fullName(user != null ? user.getFullName() : "N/A")
-                            .amount(b.getAmount())
-                            .status(b.getStatus())
-                            .proofImageUrl(b.getProofImageUrl())
-                            .month(b.getSettlement().getMonth())
-                            .year(b.getSettlement().getYear())
-                            .build();
-                })
+                .map(b -> BillDetail.builder()
+                        .id(b.getId())
+                        .userEmail(user != null ? user.getEmail() : "N/A")
+                        .fullName(user != null ? user.getFullName() : "N/A")
+                        .amount(b.getAmount())
+                        .status(b.getStatus())
+                        .proofImageUrl(b.getProofImageUrl())
+                        .month(b.getSettlement().getMonth())
+                        .year(b.getSettlement().getYear())
+                        .build())
                 .toList();
+    }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public BillBreakdownResponse getBillBreakdown(UUID billId) {
+        SettlementBill bill = settlementBillRepository.findWithSettlementById(billId)
+                .orElseThrow(() -> new SettlementException("Hong tìm thấy hóa đơn này đâu ròi!"));
+
+        Settlement settlement = bill.getSettlement();
+        UUID memberId = bill.getUserId();
+
+        List<Expense> settledExpenses = expenseRepository.findBySettlementIdOrderByExpenseDateDesc(settlement.getId());
+        Map<UUID, User> membersMap = userRepository.findByFamilyId(settlement.getFamilyId()).stream()
+                .collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a));
+
+        User member = membersMap.get(memberId);
+
+        BigDecimal totalPaid = BigDecimal.ZERO;
+        BigDecimal totalOwed = BigDecimal.ZERO;
+        List<BillBreakdownResponse.BreakdownItem> items = new ArrayList<>();
+
+        for (Expense expense : settledExpenses) {
+            UUID payerId = UUID.fromString(expense.getPaidByUserId());
+            BigDecimal myPaid = payerId.equals(memberId) ? expense.getAmount() : BigDecimal.ZERO;
+
+            Map<UUID, BigDecimal> shares = ExpenseShareCalculator.calculateShares(expense);
+            BigDecimal myShare = shares.getOrDefault(memberId, BigDecimal.ZERO);
+
+            if (myPaid.compareTo(BigDecimal.ZERO) == 0 && myShare.compareTo(BigDecimal.ZERO) == 0) {
+                continue;
+            }
+
+            totalPaid = totalPaid.add(myPaid);
+            totalOwed = totalOwed.add(myShare);
+
+            User payer = membersMap.get(payerId);
+            String payerName = payer != null ? payer.getFullName() : "Thành viên cũ";
+
+            items.add(BillBreakdownResponse.BreakdownItem.builder()
+                    .expenseId(expense.getId())
+                    .title(expense.getTitle())
+                    .expenseDate(expense.getExpenseDate())
+                    .totalExpenseAmount(expense.getAmount())
+                    .paidByName(payerName)
+                    .participantCount(expense.getParticipants() != null ? expense.getParticipants().size() : 0)
+                    .myPaidAmount(myPaid)
+                    .myShareAmount(myShare)
+                    .netImpact(myShare.subtract(myPaid))
+                    .build());
+        }
+
+        return BillBreakdownResponse.builder()
+                .billId(bill.getId())
+                .settlementId(settlement.getId())
+                .month(settlement.getMonth())
+                .year(settlement.getYear())
+                .memberFullName(member != null ? member.getFullName() : "N/A")
+                .memberEmail(member != null ? member.getEmail() : "N/A")
+                .totalPaid(totalPaid)
+                .totalOwed(totalOwed)
+                .netAmount(bill.getAmount())
+                .items(items)
+                .build();
     }
 
     @Transactional
     public String cancelSettlement(UUID settlementId, String headEmail) {
         User head = userRepository.findByEmail(headEmail).orElseThrow(
-                () -> new SettlementException("Không tìm thấy chủ hộ"));
+                () -> new SettlementException("Hong tìm thấy Chủ hộ đâu ròi!"));
 
         Settlement settlement = settlementRepository.findById(settlementId).orElseThrow(
-                () -> new SettlementException("Không tìm thấy kỳ chốt sổ"));
+                () -> new SettlementException("Hong thấy kỳ chốt sổ này đâu hết á!"));
 
         if (head.getRole() != RoleEnum.HEAD || !head.getFamily().getId().equals(settlement.getFamilyId())) {
-            throw new SettlementException("Chỉ có chủ hộ mới có quyền hủy chốt sổ");
+            throw new SettlementException("Chỉ Chủ hộ mới được hủy chốt sổ nha!");
         }
 
         boolean hasPayments = settlement.getSettlementBills().stream()
                 .anyMatch(b -> b.getStatus() != SettlementBillStatusEnum.PENDING);
 
         if (hasPayments) {
-            throw new SettlementException("Không thể hủy kỳ chốt sổ khi đã có thành viên thực hiện thanh toán!");
+            throw new SettlementException("Có người đóng tiền ròi, hong hủy kỳ chốt sổ này được nữa nha!");
         }
 
-        // 1. Mở khóa chi tiêu
         expenseRepository.unlockExpensesBySettlementId(settlementId);
 
-        // 2. Xóa bills và settlement
         settlementBillRepository.deleteAll(settlement.getSettlementBills());
         settlementRepository.delete(settlement);
 
@@ -434,58 +473,147 @@ public class SettlementService {
     @Transactional
     public String remindPayment(UUID billId, String headEmail) {
         User head = userRepository.findByEmail(headEmail).orElseThrow(
-                () -> new SettlementException("Không tìm thấy chủ hộ"));
+                () -> new SettlementException("Hong tìm thấy Chủ hộ đâu ròi!"));
 
-        SettlementBill bill = settlementBillRepository.findById(billId).orElseThrow(
-                () -> new SettlementException("Không tìm thấy hóa đơn!"));
+        SettlementBill bill = settlementBillRepository.findWithSettlementById(billId).orElseThrow(
+                () -> new SettlementException("Hong thấy hóa đơn này đâu hết á!"));
 
         if (head.getRole() != RoleEnum.HEAD || !head.getFamily().getId().equals(bill.getSettlement().getFamilyId())) {
-            throw new SettlementException("Chỉ có chủ hộ mới có quyền nhắc thanh toán");
+            throw new SettlementException("Chỉ Chủ hộ mới được bấm nhắc nợ nha!");
         }
 
         if (bill.getStatus() != SettlementBillStatusEnum.PENDING) {
-            throw new SettlementException("Chỉ có thể nhắc thanh toán cho hóa đơn chưa đóng");
+            throw new SettlementException("Hóa đơn này đóng ròi hoặc đang chờ duyệt á, khỏi nhắc nữa nha!");
         }
 
-        LocalDateTime lastReminded = lastRemindedMap.get(billId);
-        if (lastReminded != null && lastReminded.plusHours(1).isAfter(LocalDateTime.now())) {
-            long minutesRemaining = Duration.between(LocalDateTime.now(), lastReminded.plusHours(1)).toMinutes();
-            throw new SettlementException(
-                    "Bạn chỉ có thể gửi nhắc nhở 1 lần mỗi giờ cho mỗi hóa đơn. Vui lòng thử lại sau "
-                            + minutesRemaining + " phút.");
+        if (remindCooldownMinutes > 0) {
+            LocalDateTime lastReminded = lastRemindedMap.get(billId);
+            if (lastReminded != null && lastReminded.plusMinutes(remindCooldownMinutes).isAfter(LocalDateTime.now())) {
+                long minutesRemaining = Math.max(1, Duration.between(LocalDateTime.now(), lastReminded.plusMinutes(remindCooldownMinutes)).toMinutes());
+                throw new SettlementException(
+                        "Từ từ nha, mỗi " + remindCooldownMinutes + " phút chỉ nhắc nợ được 1 lần thôi á, đợi thêm "
+                                + minutesRemaining + " phút nữa rồi bấm lại nha!");
+            }
         }
 
         User debtor = userRepository.findById(bill.getUserId()).orElseThrow(
-                () -> new SettlementException("Không tìm thấy người nợ"));
+                () -> new SettlementException("Hong tìm thấy người cần nhắc đâu ròi!"));
 
         sendRemindEmail(head, debtor, bill);
 
-        lastRemindedMap.put(billId, LocalDateTime.now());
+        if (remindCooldownMinutes > 0) {
+            lastRemindedMap.put(billId, LocalDateTime.now());
+        }
 
         return "Đã gửi email nhắc nhở thành công đến " + debtor.getFullName();
     }
 
     private void sendRemindEmail(User head, User debtor, SettlementBill bill) {
-        String subject = "🔔 Nhắc nhở: Thanh toán công nợ tháng " + bill.getSettlement().getMonth() + "/"
-                + bill.getSettlement().getYear();
+        int month = bill.getSettlement().getMonth();
+        int year = bill.getSettlement().getYear();
+        String deepLink = emailService.buildSettlementLink(month, year);
+        String ctaHtml = buildDeepLinkButtonHtml(deepLink, "Mở FinFlow để nộp minh chứng");
+
+        String memo = VietQrBuilder.buildTransferContent(month, year, debtor.getFullName(), false);
+        String emailQrUrl = VietQrBuilder.buildEmailQrUrl(
+                head.getBankCode(), head.getBankAccountNumber(), head.getBankAccountName(), bill.getAmount(), memo
+        );
+        String qrHtml = emailQrUrl != null ? buildEmailQrBlockHtml(emailQrUrl, head, memo) : "";
+
+        String subject = "FinFlow | Nhắc nhở thanh toán công nợ tháng " + month + "/" + year;
         String body = String.format(
-                "<html>" +
-                        "<body>" +
+                "<html><body style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#172420;line-height:1.6;\">" +
                         "<h2>Nhắc nhở thanh toán công nợ</h2>" +
                         "<p>Chào <b>%s</b>,</p>" +
                         "<p>Chủ hộ <b>%s</b> đã gửi lời nhắc bạn tất toán khoản nợ của tháng <b>%d/%d</b>.</p>" +
-                        "<p>Số tiền cần đóng: <b>%,.0f VND</b></p>" +
-                        "<p>Vui lòng đăng nhập vào hệ thống FinFlow để nộp minh chứng thanh toán sớm nhất có thể.</p>" +
-                        "<hr/>" +
-                        "<p><i>Đây là email tự động từ hệ thống FinFlow.</i></p>" +
-                        "</body>" +
-                        "</html>",
+                        "<p>Số tiền cần đóng: <b style=\"color:#b42318;\">%,.0f VND</b></p>" +
+                        "%s" +
+                        "<p>Vui lòng mở FinFlow để nộp minh chứng thanh toán sớm nhất có thể.</p>" +
+                        "%s" +
+                        "<hr/><p style=\"font-size:12px;color:#6c7f78;\"><i>Đây là email tự động từ hệ thống FinFlow.</i></p>" +
+                        "</body></html>",
                 debtor.getFullName(),
                 head.getFullName(),
-                bill.getSettlement().getMonth(),
-                bill.getSettlement().getYear(),
-                bill.getAmount().abs());
+                month,
+                year,
+                bill.getAmount().abs(),
+                qrHtml,
+                ctaHtml);
 
-        emailService.sendEmail(debtor.getEmail(), subject, body);
+        emailService.sendEmailAfterCommit(debtor.getEmail(), subject, body);
+    }
+
+    private BillDetail buildBillDetail(SettlementBill bill, User member, User head, Integer month, Integer year) {
+        String memberName = member != null ? member.getFullName() : "N/A";
+        String memberEmail = member != null ? member.getEmail() : "N/A";
+
+        String qrImageUrl = null;
+        String recipientBankCode = null;
+        String recipientAccountNumber = null;
+        String recipientAccountName = null;
+        String transferContent = null;
+
+        if (bill.getStatus() != SettlementBillStatusEnum.COMPLETED
+                && bill.getAmount() != null
+                && bill.getAmount().compareTo(BigDecimal.ZERO) != 0) {
+            boolean isDebtor = bill.getAmount().compareTo(BigDecimal.ZERO) > 0;
+            User recipient = isDebtor ? head : member;
+            if (recipient != null && month != null && year != null) {
+                transferContent = VietQrBuilder.buildTransferContent(month, year, memberName, !isDebtor);
+                qrImageUrl = VietQrBuilder.buildWebQrUrl(
+                        recipient.getBankCode(),
+                        recipient.getBankAccountNumber(),
+                        recipient.getBankAccountName(),
+                        bill.getAmount(),
+                        transferContent
+                );
+                if (qrImageUrl != null) {
+                    recipientBankCode = recipient.getBankCode();
+                    recipientAccountNumber = recipient.getBankAccountNumber();
+                    recipientAccountName = recipient.getBankAccountName();
+                }
+            }
+        }
+
+        return BillDetail.builder()
+                .id(bill.getId())
+                .userEmail(memberEmail)
+                .fullName(memberName)
+                .amount(bill.getAmount())
+                .status(bill.getStatus())
+                .proofImageUrl(bill.getProofImageUrl())
+                .month(month)
+                .year(year)
+                .qrImageUrl(qrImageUrl)
+                .recipientBankCode(recipientBankCode)
+                .recipientAccountNumber(recipientAccountNumber)
+                .recipientAccountName(recipientAccountName)
+                .transferContent(transferContent)
+                .build();
+    }
+
+    private String buildDeepLinkButtonHtml(String deepLink, String label) {
+        if (deepLink == null || deepLink.isBlank()) {
+            return "";
+        }
+        return String.format(
+                "<div style=\"margin:18px 0;\"><a href=\"%s\" style=\"display:inline-block;padding:12px 20px;background-color:#1b7352;color:#ffffff;text-decoration:none;border-radius:10px;font-size:14px;font-weight:600;\">%s</a></div>",
+                deepLink, label
+        );
+    }
+
+    private String buildEmailQrBlockHtml(String qrPngUrl, User recipient, String memo) {
+        return String.format(
+                "<div style=\"margin:18px 0;padding:16px;background-color:#f2f6f3;border:1px solid #d9dfd9;border-radius:12px;text-align:center;\">" +
+                        "<p style=\"margin:0 0 10px;font-size:13px;font-weight:600;color:#172420;\">Quét mã VietQR để chuyển khoản nhanh</p>" +
+                        "<img src=\"%s\" alt=\"Mã VietQR\" style=\"max-width:240px;width:100%%;height:auto;border-radius:8px;\" />" +
+                        "<p style=\"margin:10px 0 0;font-size:12px;color:#354741;\"><b>%s</b> - %s (%s)<br/>Nội dung: <b>%s</b></p>" +
+                        "</div>",
+                qrPngUrl,
+                recipient.getBankCode(),
+                recipient.getBankAccountNumber(),
+                recipient.getBankAccountName() != null ? recipient.getBankAccountName() : recipient.getFullName(),
+                memo
+        );
     }
 }

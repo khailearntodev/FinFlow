@@ -2,12 +2,14 @@ package com.finflow.core.expense.service;
 
 import com.finflow.core.audit.service.AuditService;
 import com.finflow.core.enums.AuditEnum;
+import com.finflow.core.enums.ExpenseCategory;
 import com.finflow.core.enums.ExpenseStatus;
 import com.finflow.core.enums.RoleEnum;
 import com.finflow.core.exception.ExpenseException;
 import com.finflow.core.exception.FamilyException;
 import com.finflow.core.expense.domain.Expense;
 import com.finflow.core.expense.domain.ExpenseParticipant;
+import com.finflow.core.expense.dto.ExpenseAnalyticsResponse;
 import com.finflow.core.expense.dto.ExpenseCreateRequest;
 import com.finflow.core.expense.dto.ExpenseResponse;
 import com.finflow.core.expense.repository.ExpenseParticipantRepository;
@@ -46,12 +48,12 @@ public class ExpenseService {
     @Transactional
     public String createExpense(ExpenseCreateRequest expenseCreateRequest, UUID operatorId) {
         User operator = userRepository.findById(operatorId)
-                .orElseThrow(() -> new ExpenseException("Không tìm thấy người thực hiện!"));
+                .orElseThrow(() -> new ExpenseException("Ủa hong thấy người thực hiện đâu hết á, kiểm tra lại nha!"));
 
         User payer = userRepository.findByEmail(expenseCreateRequest.getPaidByEmail())
-                .orElseThrow(() -> new ExpenseException("Không tìm thấy người chi tiền!"));
+                .orElseThrow(() -> new ExpenseException("Hong thấy người trả tiền đâu ròi, chọn lại nha!"));
 
-        if (payer.getFamily() == null) throw new ExpenseException("Người chi tiền phải thuộc về 1 gia đình!");
+        if (payer.getFamily() == null) throw new ExpenseException("Người trả tiền chưa vô gia đình nào hết á, vô nhà trước đi nha!");
 
         List<UUID> familyMemberIds = payer.getFamily().getMembers().stream()
                 .map(User::getId)
@@ -59,13 +61,14 @@ public class ExpenseService {
 
         for (UUID participantId : expenseCreateRequest.getParticipantIDs()) {
             if (!familyMemberIds.contains(participantId)) {
-                throw new ExpenseException("Lỗi: Người dùng có ID " + participantId + " không phải là thành viên trong gia đình của bạn!");
+                throw new ExpenseException("Bịp nha, có người hong phải thành viên nhà mình trong danh sách chia tiền á!");
             }
         }
 
         Expense expense = Expense.builder()
                 .familyId(payer.getFamily().getId())
                 .status(ExpenseStatus.PENDING)
+                .category(expenseCreateRequest.getCategory() != null ? expenseCreateRequest.getCategory() : ExpenseCategory.OTHER)
                 .amount(expenseCreateRequest.getAmount())
                 .expenseDate(expenseCreateRequest.getExpenseDate())
                 .title(expenseCreateRequest.getTitle())
@@ -99,19 +102,19 @@ public class ExpenseService {
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ExpenseResponse getExpenseById(UUID familyId, UUID expenseId){
         Expense expense = expenseRepository.findById(expenseId).orElseThrow(
-                () -> new ExpenseException("Không tìm thấy khoảng chi tiêu " + expenseId)
+                () -> new ExpenseException("Khoản chi này bay màu hay gì ròi, tìm hong thấy á!")
         );
 
         Family family = familyRepository.findById(familyId).orElseThrow(
-                () -> new ExpenseException("Không tìm thấy gia đình " + familyId)
+                () -> new ExpenseException("Hong tìm thấy gia đình này đâu nha!")
         );
 
         if (!family.getId().equals(expense.getFamilyId())) {
-            throw new ExpenseException("Chi tiêu không thuộc về gia đình này");
+            throw new ExpenseException("Bịp nha, khoản chi này đâu phải của nhà mình!");
         }
 
         User payer = userRepository.findById(UUID.fromString(expense.getPaidByUserId())).orElseThrow(
-                () -> new ExpenseException("Không tìm thấy người chi trả")
+                () -> new ExpenseException("Hong thấy người trả tiền đâu ròi!")
         );
 
         List<UUID> participantIds = expense.getParticipants().stream()
@@ -153,7 +156,7 @@ public class ExpenseService {
 
             User payer = userMap.get(UUID.fromString(expense.getPaidByUserId()));
             if (payer == null) {
-                throw new ExpenseException("Không tìm thấy người chi trả cho khoản: " + expense.getTitle());
+                throw new ExpenseException("Hong tìm thấy người trả tiền cho khoản \"" + expense.getTitle() + "\" ròi!");
             }
 
             List<String> participantEmails = expense.getParticipants().stream()
@@ -172,6 +175,7 @@ public class ExpenseService {
                     .paidByEmail(payer.getEmail())
                     .participants(participantEmails)
                     .status(expense.getStatus())
+                    .category(expense.getCategory() != null ? expense.getCategory() : ExpenseCategory.OTHER)
                     .build();
 
         }).toList();
@@ -180,19 +184,19 @@ public class ExpenseService {
     @Transactional
     public void deleteExpense(UUID familyId, UUID expenseId, UUID userId){
         Expense expense = expenseRepository.findById(expenseId).orElseThrow(
-                () -> new ExpenseException("Không tìm thấy khoảng chi tiêu " + expenseId)
+                () -> new ExpenseException("Khoản chi này hong tồn tại hoặc bị xóa mất ròi nha!")
         );
 
         User user = userRepository.findById(userId).orElseThrow(
-                () -> new ExpenseException("Không tìm thấy người dùng")
+                () -> new ExpenseException("Hong thấy tài khoản của bạn đâu hết á!")
         );
 
         if (expense.getStatus() == ExpenseStatus.SETTLED) {
-            throw new ExpenseException("Không được xóa khoản chi đã chốt sổ");
+            throw new ExpenseException("Khoản chi này chốt sổ ròi, hong xóa được nữa nha!");
         }
 
         if (!expense.getFamilyId().equals(familyId)) {
-            throw new ExpenseException("Đây không phải khoản chi thuộc về gia đình này");
+            throw new ExpenseException("Khoản chi này đâu phải của nhà mình đâu, bịp vừa thôi nha!");
         }
         Map<String, Object> oldData = extractExpenseSnapshot(expense);
 
@@ -212,26 +216,26 @@ public class ExpenseService {
     public ExpenseResponse updateExpense(UUID familyId, UUID expenseId, ExpenseCreateRequest expenseCreateRequest, UUID userId){
  
         Expense expense = expenseRepository.findById(expenseId).orElseThrow(
-                () -> new ExpenseException("Không tồn tại khoản chi này")
+                () -> new ExpenseException("Khoản chi này hong tồn tại ròi nha!")
         );
  
         User user = userRepository.findById(userId).orElseThrow(
-                () -> new ExpenseException("Không tìm thấy người dùng thực hiện yêu cầu")
+                () -> new ExpenseException("Hong thấy người thực hiện đâu hết á!")
         );
  
         if (!expense.getFamilyId().equals(familyId)) {
-            throw new ExpenseException("Khoản chi không thuộc về gia đình này");
+            throw new ExpenseException("Khoản chi này hong phải của nhà mình đâu nha!");
         }
  
         if (expense.getStatus() == ExpenseStatus.SETTLED) {
-            throw new ExpenseException("Khoản chi đã được kết sổ rồi, không thể sửa");
+            throw new ExpenseException("Khoản chi này chốt sổ mất tiêu ròi, sửa hong được nữa nha!");
         }
  
         User payer = userRepository.findByEmail(expenseCreateRequest.getPaidByEmail())
-                .orElseThrow(() -> new ExpenseException("Người thanh toán không hợp lệ"));
+                .orElseThrow(() -> new ExpenseException("Người trả tiền hong hợp lệ ròi, chọn lại nha!"));
  
         if (payer.getFamily() == null || !payer.getFamily().getId().equals(familyId)) {
-            throw new ExpenseException("Người thanh toán phải là thành viên trong gia đình");
+            throw new ExpenseException("Người trả tiền phải là người trong nhà mình mới ok nha!");
         }
 
         Map<String, Object> oldData = extractExpenseSnapshot(expense);
@@ -242,7 +246,7 @@ public class ExpenseService {
 
         for (UUID participantId : expenseCreateRequest.getParticipantIDs()) {
             if (!familyMemberIds.contains(participantId)) {
-                throw new ExpenseException("Người được chia tiền (ID: " + participantId + ") không nằm trong gia đình!");
+                throw new ExpenseException("Bịp nha, có người được chia tiền hong nằm trong nhà mình á!");
             }
         }
 
@@ -250,6 +254,11 @@ public class ExpenseService {
         expense.setAmount(expenseCreateRequest.getAmount());
         expense.setExpenseDate(expenseCreateRequest.getExpenseDate());
         expense.setPaidByUserId(payer.getId().toString());
+        if (expenseCreateRequest.getCategory() != null) {
+            expense.setCategory(expenseCreateRequest.getCategory());
+        } else if (expense.getCategory() == null) {
+            expense.setCategory(ExpenseCategory.OTHER);
+        }
         expense.setUpdatedBy(userId);
 
         List<UUID> newParticipantIds = expenseCreateRequest.getParticipantIDs().stream()
@@ -295,6 +304,99 @@ public class ExpenseService {
                 .expenseDate(expense.getExpenseDate())
                 .paidByEmail(payer.getEmail())
                 .participants(participantEmails)
+                .category(expense.getCategory() != null ? expense.getCategory() : ExpenseCategory.OTHER)
+                .build();
+    }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public ExpenseAnalyticsResponse getAnalytics(UUID familyId, int months) {
+        int safeMonths = Math.min(Math.max(months, 1), 12);
+        Family family = familyRepository.findById(familyId)
+                .orElseThrow(() -> new ExpenseException("Hong thấy gia đình này đâu ròi nha!"));
+
+        java.time.YearMonth currentYm = java.time.YearMonth.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+        java.time.YearMonth startYm = currentYm.minusMonths(safeMonths - 1L);
+
+        java.time.LocalDate fromDate = startYm.atDay(1);
+        java.time.LocalDate toDate = currentYm.atEndOfMonth();
+
+        List<Object[]> monthlyRows = expenseRepository.sumMonthlySpending(familyId, fromDate, toDate);
+        Map<String, java.math.BigDecimal> monthlyMap = new HashMap<>();
+        for (Object[] row : monthlyRows) {
+            int y = ((Number) row[0]).intValue();
+            int m = ((Number) row[1]).intValue();
+            java.math.BigDecimal sum = row[2] instanceof java.math.BigDecimal bd
+                    ? bd
+                    : java.math.BigDecimal.valueOf(((Number) row[2]).doubleValue());
+            monthlyMap.put(y + "-" + m, sum);
+        }
+
+        List<ExpenseAnalyticsResponse.MonthlyPoint> trend = new ArrayList<>();
+        for (int i = 0; i < safeMonths; i++) {
+            java.time.YearMonth ym = startYm.plusMonths(i);
+            java.math.BigDecimal total = monthlyMap.getOrDefault(ym.getYear() + "-" + ym.getMonthValue(), java.math.BigDecimal.ZERO);
+            trend.add(ExpenseAnalyticsResponse.MonthlyPoint.builder()
+                    .year(ym.getYear())
+                    .month(ym.getMonthValue())
+                    .label("T" + ym.getMonthValue() + "/" + (ym.getYear() % 100))
+                    .totalAmount(total)
+                    .build());
+        }
+
+        java.math.BigDecimal currentMonthTotal = monthlyMap.getOrDefault(
+                currentYm.getYear() + "-" + currentYm.getMonthValue(), java.math.BigDecimal.ZERO
+        );
+
+        List<Object[]> categoryRows = expenseRepository.sumByCategoryForPeriod(
+                familyId, currentYm.atDay(1), currentYm.atEndOfMonth()
+        );
+        Map<ExpenseCategory, java.math.BigDecimal> categoryTotals = new EnumMap<>(ExpenseCategory.class);
+        for (Object[] row : categoryRows) {
+            ExpenseCategory cat = row[0] instanceof ExpenseCategory ec ? ec : ExpenseCategory.OTHER;
+            java.math.BigDecimal amt = row[1] instanceof java.math.BigDecimal bd
+                    ? bd
+                    : java.math.BigDecimal.valueOf(((Number) row[1]).doubleValue());
+            categoryTotals.merge(cat, amt, java.math.BigDecimal::add);
+        }
+
+        List<ExpenseAnalyticsResponse.CategorySlice> breakdown = categoryTotals.entrySet().stream()
+                .sorted(Map.Entry.<ExpenseCategory, java.math.BigDecimal>comparingByValue().reversed())
+                .map(entry -> {
+                    double pct = currentMonthTotal.compareTo(java.math.BigDecimal.ZERO) > 0
+                            ? entry.getValue().multiply(java.math.BigDecimal.valueOf(100))
+                            .divide(currentMonthTotal, 1, java.math.RoundingMode.HALF_UP).doubleValue()
+                            : 0.0;
+                    return ExpenseAnalyticsResponse.CategorySlice.builder()
+                            .category(entry.getKey())
+                            .amount(entry.getValue())
+                            .percentage(pct)
+                            .build();
+                })
+                .toList();
+
+        java.math.BigDecimal budget = family.getMonthlyBudget();
+        Double usagePercent = null;
+        String budgetStatus = "NONE";
+        if (budget != null && budget.compareTo(java.math.BigDecimal.ZERO) > 0) {
+            usagePercent = currentMonthTotal.multiply(java.math.BigDecimal.valueOf(100))
+                    .divide(budget, 1, java.math.RoundingMode.HALF_UP)
+                    .doubleValue();
+            if (usagePercent > 100.0) {
+                budgetStatus = "EXCEEDED";
+            } else if (usagePercent >= 80.0) {
+                budgetStatus = "WARNING";
+            } else {
+                budgetStatus = "SAFE";
+            }
+        }
+
+        return ExpenseAnalyticsResponse.builder()
+                .currentMonthTotal(currentMonthTotal)
+                .monthlyBudget(budget)
+                .budgetUsagePercent(usagePercent)
+                .budgetStatus(budgetStatus)
+                .monthlyTrend(trend)
+                .categoryBreakdown(breakdown)
                 .build();
     }
 
@@ -321,7 +423,7 @@ public class ExpenseService {
     @Transactional
     public byte[] exportMonthlyExpensesToExcel(UUID familyId, int month, int year) {
         Family family = familyRepository.findById(familyId).orElseThrow(
-                () -> new ExpenseException("Không tìm thấy gia đình")
+                () -> new ExpenseException("Hong tìm thấy gia đình đâu hết á!")
         );
 
         java.time.LocalDate startDate = java.time.LocalDate.of(year, month, 1);
@@ -329,7 +431,7 @@ public class ExpenseService {
         List<Expense> expenses = expenseRepository.findByFamilyIdAndDateBetween(familyId, startDate, endDate);
 
         if (expenses.isEmpty()) {
-            throw new ExpenseException("Không có khoản chi nào trong tháng " + month + "/" + year);
+            throw new ExpenseException("Tháng " + month + "/" + year + " chưa có khoản chi nào hết á, có gì đâu mà xuất Excel nha!");
         }
 
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -410,7 +512,7 @@ public class ExpenseService {
             return out.toByteArray();
 
         } catch (IOException e) {
-            throw new ExpenseException("Lỗi khi tạo file Excel: " + e.getMessage());
+            throw new ExpenseException("Tạo file Excel bị lỗi ngang ròi, thử lại sau nha: " + e.getMessage());
         }
     }
 }

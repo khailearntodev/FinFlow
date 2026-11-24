@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -25,6 +26,9 @@ public class Family {
 
     @Column(name = "billing_date", nullable = false)
     private Integer billingDate;
+
+    @Column(name = "monthly_budget", precision = 15, scale = 2)
+    private BigDecimal monthlyBudget;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
