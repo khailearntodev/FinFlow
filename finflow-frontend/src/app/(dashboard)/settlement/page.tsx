@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { settlementService, getErrorMessage } from '@/services/api';
 import { formatCurrency, cn } from '@/lib/utils';
+import { toVietQrPngUrl } from '@/lib/vietqr';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -26,6 +27,7 @@ import {
   FileText,
   X,
   Copy,
+  Download,
 } from 'lucide-react';
 
 function SettlementContent() {
@@ -672,10 +674,37 @@ const BillCard = ({ bill, isHead, onUpdate, onOpenQr, onOpenBreakdown }: any) =>
 
 const VietQrModal = ({ bill, onClose }: { bill: any; onClose: () => void }) => {
   const { showToast } = useToast();
+  const [downloading, setDownloading] = useState(false);
 
   const copyText = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     showToast(`Đã sao chép ${label}`, 'success');
+  };
+
+  const pngQrUrl = toVietQrPngUrl(bill.qrImageUrl);
+
+  const handleDownloadQr = async () => {
+    if (!pngQrUrl) return;
+    setDownloading(true);
+    try {
+      const response = await fetch(pngQrUrl);
+      if (!response.ok) throw new Error('Fetch failed');
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `FinFlow_VietQR_${bill.recipientBankCode}_${bill.recipientAccountNumber}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
+      showToast('Đã tải ảnh mã QR (PNG)!', 'success');
+    } catch {
+      window.open(pngQrUrl, '_blank', 'noopener,noreferrer');
+      showToast('Đã mở ảnh mã QR trong tab mới để bạn lưu về máy.', 'info');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   if (typeof document === 'undefined') return null;
@@ -698,9 +727,9 @@ const VietQrModal = ({ bill, onClose }: { bill: any; onClose: () => void }) => {
         exit={{ opacity: 0, y: 8, scale: 0.98 }}
         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-card bg-surface border border-rule shadow-lift overflow-hidden"
+        className="w-full max-w-md max-h-[92dvh] flex flex-col rounded-card bg-surface border border-rule shadow-lift overflow-hidden"
       >
-        <div className="px-6 py-4 border-b border-rule bg-paper-2/60 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-rule bg-paper-2/60 flex items-center justify-between shrink-0">
           <h2 id="vietqr-modal-title" className="font-display text-lg font-bold text-ink">
             Mã VietQR chuyển khoản
           </h2>
@@ -714,16 +743,36 @@ const VietQrModal = ({ bill, onClose }: { bill: any; onClose: () => void }) => {
           </button>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="p-6 space-y-5 overflow-y-auto">
           <div className="flex justify-center bg-paper p-4 rounded-input">
             <img
               src={bill.qrImageUrl}
               alt="Mã VietQR chuyển khoản"
-              className="w-64 h-auto max-w-full rounded-input"
+              className="w-60 h-auto max-w-full rounded-input"
             />
           </div>
 
-          <dl className="divide-y divide-rule text-sm">
+          {/* Save QR PNG for Mobile Gallery Scan */}
+          <div className="space-y-2">
+            <button
+              type="button"
+              disabled={downloading || !pngQrUrl}
+              onClick={handleDownloadQr}
+              className="ff-btn-primary w-full"
+            >
+              {downloading ? (
+                <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+              ) : (
+                <Download className="h-4 w-4" aria-hidden="true" />
+              )}
+              <span>{downloading ? 'Đang tải…' : 'Tải ảnh mã QR (PNG)'}</span>
+            </button>
+            <p className="text-xs text-muted text-center">
+              Lưu ảnh rồi chọn trong mục Quét QR của app ngân hàng để tự điền sẵn số tiền và nội dung.
+            </p>
+          </div>
+
+          <dl className="divide-y divide-rule text-sm border-t border-rule">
             <div className="py-2.5 flex items-center justify-between gap-2">
               <dt className="text-muted">Ngân hàng</dt>
               <dd className="font-semibold text-ink">{bill.recipientBankCode}</dd>
