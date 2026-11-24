@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [myBills, setMyBills] = useState<any[]>([]);
   const [analytics, setAnalytics] = useState<any | null>(null);
+  const [hoveredMonth, setHoveredMonth] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -82,14 +83,26 @@ export default function DashboardPage() {
     ...trendPoints.map((p: any) => Number(p.totalAmount || 0)),
     1
   );
+  const activeTrendMonths = trendPoints.filter((p: any) => Number(p.totalAmount || 0) > 0);
+  const avgMonthlySpend =
+    activeTrendMonths.length > 0
+      ? Math.round(
+          activeTrendMonths.reduce((sum: number, p: any) => sum + Number(p.totalAmount || 0), 0) /
+            activeTrendMonths.length
+        )
+      : 0;
   const categorySlices = analytics?.categoryBreakdown || [];
+
+  const activePoint = hoveredMonth
+    ? trendPoints.find((p: any) => `${p.year}-${p.month}` === hoveredMonth)
+    : null;
 
   if (!user?.family) {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.18 }}
         className="ff-surface p-10 sm:p-14 text-center max-w-xl mx-auto mt-8"
       >
         <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-input bg-accent-soft text-accent">
@@ -112,18 +125,18 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="space-y-8" aria-busy="true" aria-label="Đang tải tổng quan">
+      <div className="space-y-6" aria-busy="true" aria-label="Đang tải tổng quan">
         <div className="flex items-end justify-between gap-4">
           <div className="space-y-2">
-            <div className="h-8 w-56 rounded-input bg-paper-3/70 animate-pulse motion-reduce:animate-none" />
+            <div className="h-8 w-52 rounded-input bg-paper-3/70 animate-pulse motion-reduce:animate-none" />
             <div className="h-4 w-72 rounded-input bg-paper-3/50 animate-pulse motion-reduce:animate-none" />
           </div>
           <div className="h-11 w-36 rounded-input bg-paper-3/70 animate-pulse motion-reduce:animate-none" />
         </div>
-        <div className="ff-surface h-28 animate-pulse motion-reduce:animate-none" />
+        <div className="ff-surface h-24 animate-pulse motion-reduce:animate-none" />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-7 ff-surface h-80 animate-pulse motion-reduce:animate-none" />
-          <div className="lg:col-span-5 ff-ink-panel h-80 animate-pulse motion-reduce:animate-none" />
+          <div className="lg:col-span-8 ff-surface h-72 animate-pulse motion-reduce:animate-none" />
+          <div className="lg:col-span-4 ff-ink-panel h-72 animate-pulse motion-reduce:animate-none" />
         </div>
       </div>
     );
@@ -131,19 +144,19 @@ export default function DashboardPage() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-      className="space-y-8"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.18 }}
+      className="space-y-6"
     >
-      {/* Page Header */}
+      {/* Compact Header */}
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div className="min-w-0">
           <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink">
             Xin chào, {user.fullName.split(' ').pop()}
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Tổng quan sổ chi tiêu tháng {currentMonth.slice(5)}/{currentMonth.slice(0, 4)} của {user.family.name}.
+            Sổ chi tiêu tháng {currentMonth.slice(5)}/{currentMonth.slice(0, 4)} của {user.family.name}.
           </p>
         </div>
         <Link href="/expenses?action=create" className="ff-btn-primary w-full sm:w-auto">
@@ -152,44 +165,43 @@ export default function DashboardPage() {
         </Link>
       </header>
 
-      {/* Unified Ledger Stat Band */}
-      <section aria-label="Chỉ số tháng hiện tại" className="ff-surface shadow-card">
+      {/* Row 1: Compact Unified Ledger Stat Strip + Optional Budget Bar */}
+      <section aria-label="Chỉ số tháng hiện tại" className="ff-surface shadow-card overflow-hidden">
         <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-rule">
-          <div className="p-6">
-            <p className="text-sm font-medium text-muted">Tổng chi tiêu tháng</p>
-            <p className="mt-2 font-display text-2xl sm:text-3xl font-bold text-ink num">
+          <div className="px-5 py-4">
+            <p className="text-xs font-medium text-muted">Tổng chi tiêu tháng</p>
+            <p className="mt-1.5 font-display text-2xl font-bold text-ink num">
               {formatCurrency(totalMonthlySpend)}
             </p>
-            <p className="mt-1.5 text-xs text-muted num">
+            <p className="mt-1 text-xs text-muted num">
               {currentMonthExpenses.length} khoản ghi nhận trong tháng
             </p>
           </div>
 
-          <div className="p-6">
-            <p className="text-sm font-medium text-muted">Bạn đã ứng trước</p>
-            <p className="mt-2 font-display text-2xl sm:text-3xl font-bold text-accent num">
+          <div className="px-5 py-4">
+            <p className="text-xs font-medium text-muted">Bạn đã ứng trước</p>
+            <p className="mt-1.5 font-display text-2xl font-bold text-accent num">
               {formatCurrency(myTotalPaid)}
             </p>
-            <p className="mt-1.5 text-xs text-muted">
+            <p className="mt-1 text-xs text-muted">
               Tính trên các khoản bạn trực tiếp chi trả
             </p>
           </div>
 
-          <div className="p-6">
-            <p className="text-sm font-medium text-muted">Thành viên gia đình</p>
-            <p className="mt-2 font-display text-2xl sm:text-3xl font-bold text-ink num">
+          <div className="px-5 py-4">
+            <p className="text-xs font-medium text-muted">Thành viên gia đình</p>
+            <p className="mt-1.5 font-display text-2xl font-bold text-ink num">
               {memberCount} người
             </p>
-            <p className="mt-1.5 text-xs text-muted num">
+            <p className="mt-1 text-xs text-muted num">
               Chốt sổ tự động ngày {user.family.billingDate} hàng tháng
             </p>
           </div>
         </div>
 
-        {/* Monthly Budget Bar (when configured) */}
         {analytics?.monthlyBudget && analytics.budgetStatus !== 'NONE' && (
-          <div className="px-6 py-4 border-t border-rule bg-paper-2/50 space-y-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
+          <div className="px-5 py-3.5 border-t border-rule bg-paper-2/50 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <div className="flex items-center gap-2">
                 {analytics.budgetStatus !== 'SAFE' && (
                   <AlertTriangle
@@ -200,7 +212,7 @@ export default function DashboardPage() {
                     aria-hidden="true"
                   />
                 )}
-                <span className="font-semibold text-ink">
+                <span className="font-semibold text-ink num">
                   Ngân sách tháng: {formatCurrency(Number(analytics.monthlyBudget))}
                 </span>
               </div>
@@ -223,7 +235,7 @@ export default function DashboardPage() {
               </span>
             </div>
 
-            <div className="h-2.5 w-full rounded-pill bg-paper-3 overflow-hidden">
+            <div className="h-2 w-full rounded-pill bg-paper-3 overflow-hidden">
               <div
                 className={cn(
                   'h-full rounded-pill transition-transform duration-300 origin-left',
@@ -242,88 +254,134 @@ export default function DashboardPage() {
         )}
       </section>
 
-      {/* Main Split: Recent Ledger + Settlement Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <section className="lg:col-span-7 ff-surface shadow-card overflow-hidden">
-          <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-rule">
-            <h2 className="font-display text-lg font-bold text-ink">Chi tiêu gần đây</h2>
-            <Link
-              href="/expenses"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-accent hover:text-accent-deep underline-offset-4 hover:underline whitespace-nowrap transition-colors"
-            >
-              <span>Xem tất cả</span>
-              <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </div>
-
-          {recentExpenses.length === 0 ? (
-            <div className="px-6 py-14 text-center">
-              <Receipt className="h-8 w-8 text-muted mx-auto mb-3" aria-hidden="true" />
-              <p className="text-sm font-medium text-ink-2">Chưa có khoản chi nào gần đây</p>
-              <p className="mt-1 text-xs text-muted">
-                Nhấn &ldquo;Thêm chi tiêu&rdquo; để bắt đầu ghi nhận khoản đầu tiên.
+      {/* Row 2 (ABOVE THE FOLD): 6-Month Spending Trend + Settlement Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <section className="lg:col-span-8 ff-surface shadow-card p-6 flex flex-col justify-between gap-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-accent" aria-hidden="true" />
+                <h2 className="font-display text-lg font-bold text-ink">
+                  Xu hướng chi tiêu 6 tháng
+                </h2>
+              </div>
+              <p className="mt-1 text-xs text-muted num">
+                {activePoint
+                  ? `Tháng ${activePoint.month}/${activePoint.year}: ${formatCurrency(Number(activePoint.totalAmount || 0))}`
+                  : avgMonthlySpend > 0
+                    ? `Trung bình các tháng có chi tiêu: ${formatCurrency(avgMonthlySpend)}/tháng`
+                    : 'So sánh tổng chi tiêu chung theo từng tháng'}
               </p>
             </div>
-          ) : (
-            <ul className="divide-y divide-rule">
-              {recentExpenses.map((expense) => (
-                <li
-                  key={expense.id}
-                  className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-paper-2/60 transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-ink truncate">
-                      {expense.title}
-                    </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
-                      <span className="font-outlier num">{expense.expenseDate}</span>
-                      <span>
-                        Người chi:{' '}
-                        <strong className="font-medium text-ink-2">
-                          {expense.paidByEmail === user.email
-                            ? 'Bạn'
-                            : expense.paidByEmail.split('@')[0]}
-                        </strong>
+            <span className="inline-flex items-center rounded-pill bg-paper-2 border border-rule px-2.5 py-1 text-xs font-medium text-ink-2">
+              6 tháng gần nhất
+            </span>
+          </div>
+
+          {trendPoints.length > 0 ? (
+            <div className="relative pt-2">
+              {/* Subtle horizontal reference rules */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 top-6 bottom-8 flex flex-col justify-between"
+              >
+                <div className="border-t border-dashed border-rule/80" />
+                <div className="border-t border-dashed border-rule/60" />
+                <div className="border-t border-rule" />
+              </div>
+
+              <div className="relative grid grid-cols-6 gap-2 sm:gap-4 h-48 items-end">
+                {trendPoints.map((point: any, idx: number) => {
+                  const key = `${point.year}-${point.month}`;
+                  const amount = Number(point.totalAmount || 0);
+                  const ratio = maxTrendAmount > 0 ? amount / maxTrendAmount : 0;
+                  const barHeightPct = amount > 0 ? Math.max(Math.round(ratio * 100), 8) : 3;
+                  const isLatest = idx === trendPoints.length - 1;
+                  const isHovered = hoveredMonth === key;
+                  const shortLabel =
+                    amount > 0
+                      ? amount >= 1000000
+                        ? `${(amount / 1000000).toFixed(1)}tr`
+                        : `${Math.round(amount / 1000)}k`
+                      : '0';
+
+                  return (
+                    <div
+                      key={key}
+                      onMouseEnter={() => setHoveredMonth(key)}
+                      onMouseLeave={() => setHoveredMonth(null)}
+                      className="flex flex-col items-center justify-end h-full gap-2"
+                    >
+                      <div className="w-full flex-1 flex flex-col items-center justify-end gap-1.5">
+                        <span
+                          className={cn(
+                            'font-outlier text-[11px] num leading-none transition-colors',
+                            isLatest || isHovered ? 'font-semibold text-ink' : 'text-muted'
+                          )}
+                        >
+                          {shortLabel}
+                        </span>
+                        <div
+                          title={`${point.label}: ${formatCurrency(amount)}`}
+                          className={cn(
+                            'w-full max-w-[44px] rounded-t-input transition-colors',
+                            isLatest
+                              ? 'bg-accent'
+                              : isHovered
+                                ? 'bg-accent/60'
+                                : 'bg-paper-3'
+                          )}
+                          style={{ height: `${barHeightPct}%` }}
+                        />
+                      </div>
+                      <span
+                        className={cn(
+                          'font-outlier text-xs num',
+                          isLatest ? 'font-semibold text-ink' : 'text-muted'
+                        )}
+                      >
+                        {point.label}
                       </span>
                     </div>
-                  </div>
-                  <p className="font-display text-base font-bold text-ink num shrink-0">
-                    {formatCurrency(expense.amount)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="lg:col-span-5 ff-ink-panel p-6 sm:p-7 space-y-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="font-display text-lg font-bold text-paper">
-                Trạng thái chốt sổ
-              </h2>
-              <p className="mt-1 text-sm text-ink-band-muted">
-                {pendingSettlement
-                  ? `Kỳ tháng ${pendingSettlement.month}/${pendingSettlement.year}`
-                  : 'Hiện không có kỳ chốt sổ nào cần xử lý'}
-              </p>
-            </div>
-            <Calendar className="h-5 w-5 text-accent-soft shrink-0 mt-0.5" aria-hidden="true" />
-          </div>
-
-          {!pendingSettlement ? (
-            <div className="rounded-input bg-ink-band-2 border border-ink-band-rule p-4 flex items-start gap-3">
-              <Clock className="h-5 w-5 text-accent-soft shrink-0 mt-0.5" aria-hidden="true" />
-              <div>
-                <p className="text-sm font-semibold text-paper">Đang chờ đến kỳ chốt sổ</p>
-                <p className="mt-1 text-xs text-ink-band-muted num">
-                  Ngày chốt định kỳ: ngày {user.family.billingDate} hàng tháng
-                </p>
+                  );
+                })}
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="rounded-input bg-ink-band-2 border border-ink-band-rule p-5">
+            <p className="py-12 text-center text-sm text-muted">
+              Chưa có dữ liệu thống kê 6 tháng gần nhất.
+            </p>
+          )}
+        </section>
+
+        <section className="lg:col-span-4 ff-ink-panel p-6 flex flex-col justify-between gap-5">
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-display text-lg font-bold text-paper">
+                  Trạng thái chốt sổ
+                </h2>
+                <p className="mt-1 text-xs text-ink-band-muted">
+                  {pendingSettlement
+                    ? `Kỳ tháng ${pendingSettlement.month}/${pendingSettlement.year}`
+                    : 'Hiện không có kỳ chốt sổ nào cần xử lý'}
+                </p>
+              </div>
+              <Calendar className="h-5 w-5 text-accent-soft shrink-0 mt-0.5" aria-hidden="true" />
+            </div>
+
+            {!pendingSettlement ? (
+              <div className="rounded-input bg-ink-band-2 border border-ink-band-rule p-4 flex items-start gap-3">
+                <Clock className="h-5 w-5 text-accent-soft shrink-0 mt-0.5" aria-hidden="true" />
+                <div>
+                  <p className="text-sm font-semibold text-paper">Đang chờ đến kỳ chốt sổ</p>
+                  <p className="mt-1 text-xs text-ink-band-muted num">
+                    Ngày chốt định kỳ: ngày {user.family.billingDate} hàng tháng
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-input bg-ink-band-2 border border-ink-band-rule p-4">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-medium text-ink-band-muted">
                     {pendingSettlement.amount > 0 ? 'Bạn cần đóng về quỹ' : 'Bạn sẽ nhận lại'}
@@ -347,12 +405,12 @@ export default function DashboardPage() {
                           : pendingSettlement.status}
                   </span>
                 </div>
-                <p className="mt-3 font-display text-3xl font-bold text-paper num">
+                <p className="mt-2.5 font-display text-2xl font-bold text-paper num">
                   {formatCurrency(Math.abs(pendingSettlement.amount))}
                 </p>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <Link
             href="/settlement"
@@ -364,69 +422,77 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      {/* Phase 5 Analytics: 6-Month Spending Trend + Category Breakdown */}
-      {analytics && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <section className="lg:col-span-7 ff-surface shadow-card p-6 space-y-5">
-            <div className="flex items-center justify-between gap-3">
+      {/* Row 3: Recent Expenses Ledger + Category Breakdown (aligned heights) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <section className="lg:col-span-7 ff-surface shadow-card overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-rule">
+            <h2 className="font-display text-lg font-bold text-ink">Chi tiêu gần đây</h2>
+            <Link
+              href="/expenses"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-accent hover:text-accent-deep underline-offset-4 hover:underline whitespace-nowrap transition-colors"
+            >
+              <span>Xem tất cả</span>
+              <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
+
+          {recentExpenses.length === 0 ? (
+            <div className="px-6 py-12 text-center my-auto">
+              <Receipt className="h-8 w-8 text-muted mx-auto mb-3" aria-hidden="true" />
+              <p className="text-sm font-medium text-ink-2">Chưa có khoản chi nào gần đây</p>
+              <p className="mt-1 text-xs text-muted">
+                Nhấn &ldquo;Thêm chi tiêu&rdquo; để bắt đầu ghi nhận khoản đầu tiên.
+              </p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-rule">
+              {recentExpenses.map((expense) => (
+                <li
+                  key={expense.id}
+                  className="flex items-center justify-between gap-4 px-6 py-3.5 hover:bg-paper-2/60 transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-ink truncate">
+                        {expense.title}
+                      </p>
+                      <span className="hidden sm:inline-flex shrink-0 items-center rounded-pill bg-accent-soft/70 text-accent px-2 py-0.5 text-[11px] font-medium">
+                        {getCategoryLabel(expense.category)}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
+                      <span className="font-outlier num">{expense.expenseDate}</span>
+                      <span>
+                        Người chi:{' '}
+                        <strong className="font-medium text-ink-2">
+                          {expense.paidByEmail === user.email
+                            ? 'Bạn'
+                            : expense.paidByEmail.split('@')[0]}
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
+                  <p className="font-display text-sm sm:text-base font-bold text-ink num shrink-0">
+                    {formatCurrency(expense.amount)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="lg:col-span-5 ff-surface shadow-card p-6 flex flex-col justify-between gap-5">
+          <div className="space-y-5">
+            <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-accent" aria-hidden="true" />
+                <PieChart className="h-4 w-4 text-accent" aria-hidden="true" />
                 <h2 className="font-display text-lg font-bold text-ink">
-                  Xu hướng chi tiêu 6 tháng
+                  Cơ cấu theo danh mục
                 </h2>
               </div>
-              <span className="text-xs text-muted">Đơn vị: VND</span>
-            </div>
-
-            <div className="grid grid-cols-6 gap-2 sm:gap-4 items-end h-52 pt-4">
-              {trendPoints.map((point: any, idx: number) => {
-                const amount = Number(point.totalAmount || 0);
-                const ratio = maxTrendAmount > 0 ? amount / maxTrendAmount : 0;
-                const isLatest = idx === trendPoints.length - 1;
-                return (
-                  <div
-                    key={`${point.year}-${point.month}`}
-                    className="flex flex-col items-center justify-end h-full gap-2"
-                  >
-                    <span className="font-outlier text-[11px] text-muted num text-center leading-tight">
-                      {amount > 0
-                        ? amount >= 1000000
-                          ? `${(amount / 1000000).toFixed(1)}tr`
-                          : `${Math.round(amount / 1000)}k`
-                        : '0'}
-                    </span>
-                    <div className="w-full flex-1 flex items-end">
-                      <div
-                        title={`${point.label}: ${formatCurrency(amount)}`}
-                        className={cn(
-                          'w-full rounded-t-input transition-colors',
-                          isLatest ? 'bg-accent' : 'bg-paper-3 hover:bg-accent-soft'
-                        )}
-                        style={{
-                          height: `${Math.max(Math.round(ratio * 100), amount > 0 ? 8 : 3)}%`,
-                        }}
-                      />
-                    </div>
-                    <span
-                      className={cn(
-                        'font-outlier text-xs num',
-                        isLatest ? 'font-semibold text-ink' : 'text-muted'
-                      )}
-                    >
-                      {point.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="lg:col-span-5 ff-surface shadow-card p-6 space-y-5">
-            <div className="flex items-center gap-2">
-              <PieChart className="h-4 w-4 text-accent" aria-hidden="true" />
-              <h2 className="font-display text-lg font-bold text-ink">
-                Cơ cấu theo danh mục
-              </h2>
+              <span className="text-xs text-muted num">
+                Tháng {currentMonth.slice(5)}/{currentMonth.slice(0, 4)}
+              </span>
             </div>
 
             {categorySlices.length === 0 ? (
@@ -457,9 +523,19 @@ export default function DashboardPage() {
                 ))}
               </ul>
             )}
-          </section>
-        </div>
-      )}
+          </div>
+
+          <div className="pt-4 border-t border-rule flex items-center justify-between text-xs text-muted">
+            <span>Phân loại khi thêm hoặc sửa khoản chi</span>
+            <Link
+              href="/expenses"
+              className="font-semibold text-accent hover:text-accent-deep hover:underline underline-offset-4 whitespace-nowrap"
+            >
+              Lọc theo danh mục
+            </Link>
+          </div>
+        </section>
+      </div>
     </motion.div>
   );
 }

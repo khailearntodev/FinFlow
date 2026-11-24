@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Be_Vietnam_Pro, DM_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, Be_Vietnam_Pro, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ToastProvider } from "@/contexts/ToastContext";
@@ -20,10 +20,10 @@ const beVietnam = Be_Vietnam_Pro({
   display: "swap",
 });
 
-const dmMono = DM_Mono({
-  subsets: ["latin"],
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin", "vietnamese"],
   weight: ["400", "500"],
-  variable: "--font-dm-mono",
+  variable: "--font-jetbrains-mono",
   display: "swap",
 });
 
@@ -46,7 +46,7 @@ export default function RootLayout({
   return (
     <html
       lang="vi"
-      className={`${plusJakarta.variable} ${beVietnam.variable} ${dmMono.variable} h-full antialiased`}
+      className={`${plusJakarta.variable} ${beVietnam.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-paper text-ink font-body">
         <MotionProvider>

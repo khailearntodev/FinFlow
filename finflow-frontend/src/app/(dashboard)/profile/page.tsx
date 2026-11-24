@@ -16,9 +16,12 @@ import {
   Phone,
   ChevronDown,
   Save,
+  QrCode,
+  Download,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { buildVietQrImageUrl } from '@/lib/vietqr';
 
 const VIETNAM_BANKS = [
   { code: 'MB', name: 'MB Bank (Quân Đội)' },
@@ -57,6 +60,12 @@ export default function ProfilePage() {
     confirmPassword: '',
   });
   const [savingPassword, setSavingPassword] = useState(false);
+  const [downloadingQr, setDownloadingQr] = useState(false);
+  const [debouncedBank, setDebouncedBank] = useState({
+    bankCode: '',
+    bankAccountNumber: '',
+    bankAccountName: '',
+  });
 
   useEffect(() => {
     if (!user) return;
@@ -67,11 +76,72 @@ export default function ProfilePage() {
       bankAccountNumber: user.bankAccountNumber || '',
       bankAccountName: user.bankAccountName || '',
     });
+    setDebouncedBank({
+      bankCode: user.bankCode || '',
+      bankAccountNumber: user.bankAccountNumber || '',
+      bankAccountName: user.bankAccountName || '',
+    });
   }, [user]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedBank({
+        bankCode: profileForm.bankCode,
+        bankAccountNumber: profileForm.bankAccountNumber,
+        bankAccountName: profileForm.bankAccountName,
+      });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [profileForm.bankCode, profileForm.bankAccountNumber, profileForm.bankAccountName]);
 
   if (!user) return null;
 
   const isHead = user.role === 'HEAD';
+
+  const qrSvgUrl = buildVietQrImageUrl({
+    bankCode: debouncedBank.bankCode,
+    accountNumber: debouncedBank.bankAccountNumber,
+    accountName: debouncedBank.bankAccountName,
+    format: 'svg',
+  });
+
+  const qrPngUrl = buildVietQrImageUrl({
+    bankCode: debouncedBank.bankCode,
+    accountNumber: debouncedBank.bankAccountNumber,
+    accountName: debouncedBank.bankAccountName,
+    format: 'png',
+  });
+
+  const hasUnsavedBankChanges =
+    (profileForm.bankCode || '').trim() !== (user.bankCode || '').trim() ||
+    (profileForm.bankAccountNumber || '').trim() !== (user.bankAccountNumber || '').trim() ||
+    (profileForm.bankAccountName || '').trim() !== (user.bankAccountName || '').trim();
+
+  const handleDownloadQr = async () => {
+    if (!qrPngUrl) return;
+    setDownloadingQr(true);
+    try {
+      const response = await fetch(qrPngUrl);
+      if (!response.ok) throw new Error('Fetch failed');
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const cleanBank = debouncedBank.bankCode.trim().toUpperCase();
+      const cleanAcc = debouncedBank.bankAccountNumber.trim().replace(/\s+/g, '');
+      link.href = objectUrl;
+      link.download = `FinFlow_VietQR_${cleanBank}_${cleanAcc}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
+      showToast('Đã tải ảnh mã VietQR (PNG)!', 'success');
+    } catch {
+      window.open(qrPngUrl, '_blank', 'noopener,noreferrer');
+      showToast('Đã mở ảnh mã QR trong tab mới để bạn lưu về máy.', 'info');
+    } finally {
+      setDownloadingQr(false);
+    }
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,71 +207,132 @@ export default function ProfilePage() {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Summary Card */}
-        <aside className="lg:col-span-4 ff-surface shadow-card p-6 space-y-5">
-          <div className="text-center">
-            <div className="mx-auto h-20 w-20 rounded-pill bg-accent text-accent-ink font-display text-3xl font-bold flex items-center justify-center mb-4">
-              {user.fullName.charAt(0).toUpperCase()}
-            </div>
-            <h2 className="font-display text-xl font-bold text-ink">
-              {user.fullName}
-            </h2>
-            <p className="text-sm text-muted mt-1 break-all">{user.email}</p>
+        {/* Left Column: Summary + Personal VietQR */}
+        <div className="lg:col-span-4 space-y-6">
+          <aside className="ff-surface shadow-card p-6 space-y-5">
+            <div className="text-center">
+              <div className="mx-auto h-20 w-20 rounded-pill bg-accent text-accent-ink font-display text-3xl font-bold flex items-center justify-center mb-4">
+                {user.fullName.charAt(0).toUpperCase()}
+              </div>
+              <h2 className="font-display text-xl font-bold text-ink">
+                {user.fullName}
+              </h2>
+              <p className="text-sm text-muted mt-1 break-all">{user.email}</p>
 
-            <div className="mt-4 flex justify-center">
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-pill px-3 py-1 text-xs font-semibold',
-                  isHead
-                    ? 'bg-accent-soft text-accent'
-                    : 'bg-paper-2 text-ink-2'
-                )}
-              >
-                <Shield className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>{isHead ? 'Chủ hộ' : 'Thành viên'}</span>
-              </span>
+              <div className="mt-4 flex justify-center">
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-pill px-3 py-1 text-xs font-semibold',
+                    isHead
+                      ? 'bg-accent-soft text-accent'
+                      : 'bg-paper-2 text-ink-2'
+                  )}
+                >
+                  <Shield className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>{isHead ? 'Chủ hộ' : 'Thành viên'}</span>
+                </span>
+              </div>
             </div>
-          </div>
 
-          <dl className="pt-5 border-t border-rule space-y-3 text-sm">
-            <div className="flex items-center justify-between gap-2">
-              <dt className="flex items-center gap-2 text-muted">
-                <Users className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>Gia đình</span>
-              </dt>
-              <dd className="font-semibold text-ink truncate">
-                {user.family?.name || 'Chưa tham gia'}
-              </dd>
+            <dl className="pt-5 border-t border-rule space-y-3 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <dt className="flex items-center gap-2 text-muted">
+                  <Users className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>Gia đình</span>
+                </dt>
+                <dd className="font-semibold text-ink truncate">
+                  {user.family?.name || 'Chưa tham gia'}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <dt className="flex items-center gap-2 text-muted">
+                  <Calendar className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>Ngày tham gia</span>
+                </dt>
+                <dd className="font-outlier text-xs font-medium text-ink num">
+                  {new Date(user.createdAt || Date.now()).toLocaleDateString('vi-VN')}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <dt className="flex items-center gap-2 text-muted">
+                  <Landmark className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>VietQR</span>
+                </dt>
+                <dd
+                  className={cn(
+                    'text-xs font-semibold',
+                    user.bankCode && user.bankAccountNumber
+                      ? 'text-success-ink'
+                      : 'text-muted'
+                  )}
+                >
+                  {user.bankCode && user.bankAccountNumber
+                    ? `${user.bankCode} (${user.bankAccountNumber})`
+                    : 'Chưa thiết lập'}
+                </dd>
+              </div>
+            </dl>
+          </aside>
+
+          {/* Personal VietQR Preview & Download Card */}
+          <section className="ff-surface shadow-card overflow-hidden">
+            <div className="px-6 py-4 border-b border-rule bg-paper-2/60 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <QrCode className="h-4 w-4 text-accent shrink-0" aria-hidden="true" />
+                <h3 className="font-display text-base font-bold text-ink truncate">
+                  Mã VietQR cá nhân
+                </h3>
+              </div>
+              {hasUnsavedBankChanges && qrSvgUrl && (
+                <span className="shrink-0 rounded-pill bg-warn-soft px-2.5 py-0.5 text-xs font-semibold text-warn-ink">
+                  Chưa lưu
+                </span>
+              )}
             </div>
-            <div className="flex items-center justify-between gap-2">
-              <dt className="flex items-center gap-2 text-muted">
-                <Calendar className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>Ngày tham gia</span>
-              </dt>
-              <dd className="font-outlier text-xs font-medium text-ink num">
-                {new Date(user.createdAt || Date.now()).toLocaleDateString('vi-VN')}
-              </dd>
+
+            <div className="p-6 space-y-4">
+              {qrSvgUrl ? (
+                <>
+                  <div className="flex justify-center bg-paper p-3 rounded-input">
+                    <img
+                      src={qrSvgUrl}
+                      alt="Mã VietQR cá nhân"
+                      className="w-56 h-auto max-w-full rounded-input"
+                    />
+                  </div>
+
+                  <p className="text-xs text-muted text-center">
+                    Quét thử bằng ứng dụng ngân hàng để kiểm tra đúng tài khoản nhận tiền.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadQr}
+                    disabled={downloadingQr || !qrPngUrl}
+                    className="ff-btn-secondary w-full"
+                  >
+                    {downloadingQr ? (
+                      <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                    ) : (
+                      <Download className="h-4 w-4" aria-hidden="true" />
+                    )}
+                    <span>{downloadingQr ? 'Đang tải…' : 'Tải ảnh QR (PNG)'}</span>
+                  </button>
+                </>
+              ) : (
+                <div className="py-6 text-center space-y-2">
+                  <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-pill bg-paper-2 text-muted">
+                    <QrCode className="h-5 w-5" aria-hidden="true" />
+                  </div>
+                  <p className="text-sm font-medium text-ink">Chưa có mã VietQR</p>
+                  <p className="text-xs text-muted">
+                    Chọn ngân hàng và nhập số tài khoản ở khung bên cạnh để xem trước và tải mã QR của bạn.
+                  </p>
+                </div>
+              )}
             </div>
-            <div className="flex items-center justify-between gap-2">
-              <dt className="flex items-center gap-2 text-muted">
-                <Landmark className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>VietQR</span>
-              </dt>
-              <dd
-                className={cn(
-                  'text-xs font-semibold',
-                  user.bankCode && user.bankAccountNumber
-                    ? 'text-success-ink'
-                    : 'text-muted'
-                )}
-              >
-                {user.bankCode && user.bankAccountNumber
-                  ? `${user.bankCode} (${user.bankAccountNumber})`
-                  : 'Chưa thiết lập'}
-              </dd>
-            </div>
-          </dl>
-        </aside>
+          </section>
+        </div>
 
         {/* Right Forms */}
         <div className="lg:col-span-8 space-y-6">

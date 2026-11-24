@@ -426,7 +426,7 @@ export default function FamilyPage() {
                         monthlyBudget: e.target.value,
                       })
                     }
-                    className="ff-input font-outlier num [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="ff-input font-outlier placeholder:font-body num [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
 
