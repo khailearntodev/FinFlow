@@ -232,11 +232,18 @@ function SettlementContent() {
               onChange={(e) => setSelectedYear(parseInt(e.target.value))}
               className="flex-1 min-h-[44px] px-3.5 bg-transparent text-sm font-outlier font-medium text-ink outline-none border-l border-rule num"
             >
-              {[2024, 2025, 2026, 2027].map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
+              {(() => {
+                const startYear = Math.min(2024, selectedYear);
+                const endYear = Math.max(new Date().getFullYear() + 1, selectedYear);
+                return Array.from(
+                  { length: endYear - startYear + 1 },
+                  (_, i) => startYear + i
+                ).map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ));
+              })()}
             </select>
           </div>
 
