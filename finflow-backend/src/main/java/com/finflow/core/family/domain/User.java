@@ -41,6 +41,15 @@ public class User {
     @Column(name = "role", nullable = false)
     private RoleEnum role;
 
+    @Column(name = "bank_code", length = 20)
+    private String bankCode;
+
+    @Column(name = "bank_account_number", length = 30)
+    private String bankAccountNumber;
+
+    @Column(name = "bank_account_name", length = 100)
+    private String bankAccountName;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private ZonedDateTime createdAt;

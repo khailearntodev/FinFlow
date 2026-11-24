@@ -1,52 +1,32 @@
 package com.finflow.core.family.controller;
 
-import com.finflow.core.exception.FamilyException;
-import com.finflow.core.family.domain.User;
+import com.finflow.core.family.dto.ChangePasswordRequest;
+import com.finflow.core.family.dto.UpdateProfileRequest;
 import com.finflow.core.family.dto.UserProfileResponse;
-import com.finflow.core.family.repository.UserRepository;
+import com.finflow.core.family.service.UserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/user")
 @RequiredArgsConstructor
 public class UserController {
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     @GetMapping("/me")
-    @Transactional(readOnly = true)
     public ResponseEntity<UserProfileResponse> getProfile(@RequestParam("email") String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new FamilyException("Không tìm thấy người dùng"));
+        return ResponseEntity.ok(userService.getProfile(email));
+    }
 
-        UserProfileResponse.FamilyDetail familyDetail = null;
-        if (user.getFamily() != null) {
-            familyDetail = UserProfileResponse.FamilyDetail.builder()
-                    .id(user.getFamily().getId())
-                    .name(user.getFamily().getName())
-                    .billingDate(user.getFamily().getBillingDate())
-                    .members(user.getFamily().getMembers().stream()
-                            .map(m -> UserProfileResponse.MemberDetail.builder()
-                                    .id(m.getId())
-                                    .fullName(m.getFullName())
-                                    .email(m.getEmail())
-                                    .role(m.getRole())
-                                    .build())
-                            .collect(Collectors.toList()))
-                    .build();
-        }
+    @PutMapping("/me")
+    public ResponseEntity<UserProfileResponse> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
+        return ResponseEntity.ok(userService.updateProfile(request));
+    }
 
-        return ResponseEntity.ok(UserProfileResponse.builder()
-                .id(user.getId())
-                .fullName(user.getFullName())
-                .email(user.getEmail())
-                .phoneNumber(user.getPhoneNumber())
-                .role(user.getRole())
-                .family(familyDetail)
-                .build());
+    @PutMapping("/password")
+    public ResponseEntity<String> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        return ResponseEntity.ok(userService.changePassword(request));
     }
 }

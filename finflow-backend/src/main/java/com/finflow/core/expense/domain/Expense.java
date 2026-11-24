@@ -1,5 +1,7 @@
 package com.finflow.core.expense.domain;
 
+import com.finflow.core.enums.ExpenseCategory;
+import com.finflow.core.enums.ExpenseStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -10,7 +12,6 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import com.finflow.core.enums.ExpenseStatus;
 
 @Entity
 @Getter
@@ -18,7 +19,13 @@ import com.finflow.core.enums.ExpenseStatus;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "expenses")
+@Table(
+        name = "expenses",
+        indexes = {
+                @Index(name = "idx_expenses_settlement_id", columnList = "settlement_id"),
+                @Index(name = "idx_expenses_family_date", columnList = "family_id, expense_date")
+        }
+)
 public class Expense {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -45,6 +52,10 @@ public class Expense {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private ExpenseStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category")
+    private ExpenseCategory category;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

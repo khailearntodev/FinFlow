@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, cn } from '@/lib/utils';
+import { getCategoryLabel } from '@/lib/categories';
 import {
   Plus,
   Clock,
@@ -9,6 +10,9 @@ import {
   Users,
   Calendar,
   ArrowUpRight,
+  BarChart3,
+  PieChart,
+  AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
@@ -19,6 +23,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const [expenses, setExpenses] = useState<any[]>([]);
   const [myBills, setMyBills] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,12 +33,14 @@ export default function DashboardPage() {
         return;
       }
       try {
-        const [expRes, billRes] = await Promise.all([
+        const [expRes, billRes, analyticsRes] = await Promise.all([
           expenseService.getAll(user.family.id),
           settlementService.getMyBills(user.id),
+          expenseService.getAnalytics(user.family.id, 6).catch(() => ({ data: null })),
         ]);
         setExpenses(expRes.data);
         setMyBills(billRes.data);
+        setAnalytics(analyticsRes.data);
       } catch (error) {
         console.error('Failed to fetch dashboard data', error);
       } finally {
@@ -69,6 +76,13 @@ export default function DashboardPage() {
   const pendingSettlement = myBills.find(
     (b) => b.status === 'PENDING' || b.status === 'WAITING_FOR_CONFIRMATION'
   );
+
+  const trendPoints = analytics?.monthlyTrend || [];
+  const maxTrendAmount = Math.max(
+    ...trendPoints.map((p: any) => Number(p.totalAmount || 0)),
+    1
+  );
+  const categorySlices = analytics?.categoryBreakdown || [];
 
   if (!user?.family) {
     return (
@@ -171,6 +185,61 @@ export default function DashboardPage() {
             </p>
           </div>
         </div>
+
+        {/* Monthly Budget Bar (when configured) */}
+        {analytics?.monthlyBudget && analytics.budgetStatus !== 'NONE' && (
+          <div className="px-6 py-4 border-t border-rule bg-paper-2/50 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
+              <div className="flex items-center gap-2">
+                {analytics.budgetStatus !== 'SAFE' && (
+                  <AlertTriangle
+                    className={cn(
+                      'h-4 w-4 shrink-0',
+                      analytics.budgetStatus === 'EXCEEDED' ? 'text-error' : 'text-warning'
+                    )}
+                    aria-hidden="true"
+                  />
+                )}
+                <span className="font-semibold text-ink">
+                  Ngân sách tháng: {formatCurrency(Number(analytics.monthlyBudget))}
+                </span>
+              </div>
+              <span
+                className={cn(
+                  'inline-flex items-center rounded-pill px-2.5 py-0.5 text-xs font-semibold num',
+                  analytics.budgetStatus === 'EXCEEDED'
+                    ? 'bg-error-soft text-error-ink'
+                    : analytics.budgetStatus === 'WARNING'
+                      ? 'bg-warning-soft text-warning-ink'
+                      : 'bg-success-soft text-success-ink'
+                )}
+              >
+                Đã dùng {analytics.budgetUsagePercent}%
+                {analytics.budgetStatus === 'EXCEEDED'
+                  ? ' (Vượt ngân sách)'
+                  : analytics.budgetStatus === 'WARNING'
+                    ? ' (Sắp chạm hạn mức)'
+                    : ''}
+              </span>
+            </div>
+
+            <div className="h-2.5 w-full rounded-pill bg-paper-3 overflow-hidden">
+              <div
+                className={cn(
+                  'h-full rounded-pill transition-transform duration-300 origin-left',
+                  analytics.budgetStatus === 'EXCEEDED'
+                    ? 'bg-error'
+                    : analytics.budgetStatus === 'WARNING'
+                      ? 'bg-warning'
+                      : 'bg-accent'
+                )}
+                style={{
+                  transform: `scaleX(${Math.min(Number(analytics.budgetUsagePercent || 0) / 100, 1)})`,
+                }}
+              />
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Main Split: Recent Ledger + Settlement Status */}
@@ -294,6 +363,103 @@ export default function DashboardPage() {
           </Link>
         </section>
       </div>
+
+      {/* Phase 5 Analytics: 6-Month Spending Trend + Category Breakdown */}
+      {analytics && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <section className="lg:col-span-7 ff-surface shadow-card p-6 space-y-5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-accent" aria-hidden="true" />
+                <h2 className="font-display text-lg font-bold text-ink">
+                  Xu hướng chi tiêu 6 tháng
+                </h2>
+              </div>
+              <span className="text-xs text-muted">Đơn vị: VND</span>
+            </div>
+
+            <div className="grid grid-cols-6 gap-2 sm:gap-4 items-end h-52 pt-4">
+              {trendPoints.map((point: any, idx: number) => {
+                const amount = Number(point.totalAmount || 0);
+                const ratio = maxTrendAmount > 0 ? amount / maxTrendAmount : 0;
+                const isLatest = idx === trendPoints.length - 1;
+                return (
+                  <div
+                    key={`${point.year}-${point.month}`}
+                    className="flex flex-col items-center justify-end h-full gap-2"
+                  >
+                    <span className="font-outlier text-[11px] text-muted num text-center leading-tight">
+                      {amount > 0
+                        ? amount >= 1000000
+                          ? `${(amount / 1000000).toFixed(1)}tr`
+                          : `${Math.round(amount / 1000)}k`
+                        : '0'}
+                    </span>
+                    <div className="w-full flex-1 flex items-end">
+                      <div
+                        title={`${point.label}: ${formatCurrency(amount)}`}
+                        className={cn(
+                          'w-full rounded-t-input transition-colors',
+                          isLatest ? 'bg-accent' : 'bg-paper-3 hover:bg-accent-soft'
+                        )}
+                        style={{
+                          height: `${Math.max(Math.round(ratio * 100), amount > 0 ? 8 : 3)}%`,
+                        }}
+                      />
+                    </div>
+                    <span
+                      className={cn(
+                        'font-outlier text-xs num',
+                        isLatest ? 'font-semibold text-ink' : 'text-muted'
+                      )}
+                    >
+                      {point.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="lg:col-span-5 ff-surface shadow-card p-6 space-y-5">
+            <div className="flex items-center gap-2">
+              <PieChart className="h-4 w-4 text-accent" aria-hidden="true" />
+              <h2 className="font-display text-lg font-bold text-ink">
+                Cơ cấu theo danh mục
+              </h2>
+            </div>
+
+            {categorySlices.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted">
+                Chưa có chi tiêu trong tháng hiện tại để phân tích danh mục.
+              </p>
+            ) : (
+              <ul className="space-y-4">
+                {categorySlices.map((slice: any) => (
+                  <li key={slice.category} className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="font-medium text-ink truncate">
+                        {getCategoryLabel(slice.category)}
+                      </span>
+                      <span className="font-outlier text-xs text-ink-2 num shrink-0">
+                        {formatCurrency(Number(slice.amount))} ({slice.percentage}%)
+                      </span>
+                    </div>
+                    <div className="h-2 w-full rounded-pill bg-paper-2 overflow-hidden">
+                      <div
+                        className="h-full rounded-pill bg-accent origin-left"
+                        style={{
+                          transform: `scaleX(${Math.min(Number(slice.percentage || 0) / 100, 1)})`,
+                        }}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      )}
     </motion.div>
   );
 }

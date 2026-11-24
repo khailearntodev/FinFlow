@@ -38,4 +38,6 @@ public class ExpenseResponse {
     private List<String> participants;
 
     private com.finflow.core.enums.ExpenseStatus status;
+
+    private com.finflow.core.enums.ExpenseCategory category;
 }

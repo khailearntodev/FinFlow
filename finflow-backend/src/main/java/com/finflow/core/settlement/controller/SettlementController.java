@@ -1,5 +1,6 @@
 package com.finflow.core.settlement.controller;
 
+import com.finflow.core.settlement.dto.BillBreakdownResponse;
 import com.finflow.core.settlement.dto.BillDetail;
 import com.finflow.core.settlement.dto.SettlementCreateRequest;
 import com.finflow.core.settlement.dto.SettlementResponse;
@@ -52,6 +53,11 @@ public class SettlementController {
     @GetMapping("/bills/user/{userId}")
     public ResponseEntity<List<BillDetail>> getMyBills(@PathVariable UUID userId) {
         return ResponseEntity.ok(settlementService.getBillsByUserId(userId));
+    }
+
+    @GetMapping("/bills/{billId}/breakdown")
+    public ResponseEntity<BillBreakdownResponse> getBillBreakdown(@PathVariable UUID billId) {
+        return ResponseEntity.ok(settlementService.getBillBreakdown(billId));
     }
     @DeleteMapping("/{settlementId}/cancel")
     public ResponseEntity<String> cancelSettlement(

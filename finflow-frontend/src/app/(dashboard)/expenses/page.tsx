@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { expenseService, getErrorMessage } from '@/services/api';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
+import { EXPENSE_CATEGORIES, getCategoryLabel } from '@/lib/categories';
 import {
   Receipt,
   Plus,
@@ -18,21 +20,21 @@ import {
   Check,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { useToast } from '@/contexts/ToastContext';
 
-export default function ExpensesPage() {
+function ExpensesContent() {
   const { user } = useAuth();
   const { showToast } = useToast();
   const searchParams = useSearchParams();
-  const router = useRouter();
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'amount'>('newest');
   const [selectedMonth, setSelectedMonth] = useState(
     new Date().toISOString().slice(0, 7)
@@ -62,9 +64,11 @@ export default function ExpensesPage() {
   useEffect(() => {
     if (searchParams.get('action') === 'create') {
       setIsModalOpen(true);
-      router.replace('/expenses');
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', '/expenses');
+      }
     }
-  }, [searchParams, router]);
+  }, [searchParams]);
 
   const handleDelete = async () => {
     if (!confirmDelete) return;
@@ -117,7 +121,9 @@ export default function ExpensesPage() {
       const matchesSearch =
         e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         e.paidByEmail.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesMonth && matchesSearch;
+      const matchesCategory =
+        selectedCategory === 'ALL' || (e.category || 'OTHER') === selectedCategory;
+      return matchesMonth && matchesSearch && matchesCategory;
     })
     .sort((a, b) => {
       if (sortBy === 'newest')
@@ -135,12 +141,7 @@ export default function ExpensesPage() {
   const filteredTotal = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-      className="space-y-6"
-    >
+    <div className="space-y-6">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="min-w-0">
           <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink">
@@ -205,21 +206,43 @@ export default function ExpensesPage() {
           />
         </div>
 
-        <div className="relative lg:w-52">
-          <select
-            aria-label="Sắp xếp chi tiêu"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'amount')}
-            className="ff-input appearance-none pr-10 font-medium"
-          >
-            <option value="newest">Mới nhất</option>
-            <option value="oldest">Cũ nhất</option>
-            <option value="amount">Số tiền lớn nhất</option>
-          </select>
-          <ChevronDown
-            className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted"
-            aria-hidden="true"
-          />
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative sm:w-48">
+            <select
+              aria-label="Lọc theo danh mục"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="ff-input appearance-none pr-10 font-medium"
+            >
+              <option value="ALL">Tất cả danh mục</option>
+              {EXPENSE_CATEGORIES.map((cat) => (
+                <option key={cat.value} value={cat.value}>
+                  {cat.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted"
+              aria-hidden="true"
+            />
+          </div>
+
+          <div className="relative sm:w-48">
+            <select
+              aria-label="Sắp xếp chi tiêu"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'amount')}
+              className="ff-input appearance-none pr-10 font-medium"
+            >
+              <option value="newest">Mới nhất</option>
+              <option value="oldest">Cũ nhất</option>
+              <option value="amount">Số tiền lớn nhất</option>
+            </select>
+            <ChevronDown
+              className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted"
+              aria-hidden="true"
+            />
+          </div>
         </div>
       </div>
 
@@ -294,6 +317,9 @@ export default function ExpensesPage() {
                             <span>Đã chốt</span>
                           </span>
                         )}
+                        <span className="inline-flex items-center rounded-pill bg-accent-soft/70 text-accent px-2 py-0.5 text-xs font-medium">
+                          {getCategoryLabel(expense.category)}
+                        </span>
                         {expense.participants.map((p: string) => (
                           <span
                             key={p}
@@ -389,7 +415,22 @@ export default function ExpensesPage() {
         confirmText="Xóa ngay"
         isLoading={loading}
       />
-    </motion.div>
+    </div>
+  );
+}
+
+export default function ExpensesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-6" aria-busy="true">
+          <div className="h-10 w-56 rounded-input bg-paper-3/70 animate-pulse motion-reduce:animate-none" />
+          <div className="ff-surface h-72 animate-pulse motion-reduce:animate-none" />
+        </div>
+      }
+    >
+      <ExpensesContent />
+    </Suspense>
   );
 }
 
@@ -403,6 +444,7 @@ const ExpenseModal = ({ onClose, onSuccess, expense }: any) => {
     amount: expense?.amount || '',
     expenseDate: expense?.expenseDate || new Date().toISOString().split('T')[0],
     paidByEmail: expense?.paidByEmail || user.email,
+    category: expense?.category || 'OTHER',
     participantIDs: expense?.participants
       ? user.family?.members
           ?.filter((m: any) => expense.participants.includes(m.email))
@@ -446,12 +488,15 @@ const ExpenseModal = ({ onClose, onSuccess, expense }: any) => {
     setFormData({ ...formData, participantIDs: newParticipants });
   };
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.18 }}
+      transition={{ duration: 0.16 }}
+      onClick={onClose}
       className="fixed inset-0 z-[400] overflow-y-auto bg-ink/45 p-4 flex items-start md:items-center justify-center"
     >
       <motion.div
@@ -459,6 +504,7 @@ const ExpenseModal = ({ onClose, onSuccess, expense }: any) => {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 10, scale: 0.98 }}
         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="expense-modal-title"
@@ -531,7 +577,7 @@ const ExpenseModal = ({ onClose, onSuccess, expense }: any) => {
               />
             </div>
 
-            <div className="sm:col-span-2">
+            <div>
               <label htmlFor="exp-payer" className="block text-sm font-medium text-ink-2 mb-1.5">
                 Người trả tiền
               </label>
@@ -547,6 +593,32 @@ const ExpenseModal = ({ onClose, onSuccess, expense }: any) => {
                   {user.family?.members?.map((member: any) => (
                     <option key={member.id} value={member.email}>
                       {member.fullName} ({member.email})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted"
+                  aria-hidden="true"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="exp-category" className="block text-sm font-medium text-ink-2 mb-1.5">
+                Danh mục chi tiêu
+              </label>
+              <div className="relative">
+                <select
+                  id="exp-category"
+                  value={formData.category}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value })
+                  }
+                  className="ff-input appearance-none pr-10 font-medium"
+                >
+                  {EXPENSE_CATEGORIES.map((cat) => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
                     </option>
                   ))}
                 </select>
@@ -637,6 +709,7 @@ const ExpenseModal = ({ onClose, onSuccess, expense }: any) => {
         type="info"
         isLoading={loading}
       />
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 };

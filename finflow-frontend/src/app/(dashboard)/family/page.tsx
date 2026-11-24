@@ -15,7 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { useToast } from '@/contexts/ToastContext';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { CreateFamilyForm } from '@/components/CreateFamilyForm';
@@ -29,6 +29,7 @@ export default function FamilyPage() {
   const [settingsForm, setSettingsForm] = useState({
     name: user?.family?.name || '',
     billingDate: user?.family?.billingDate || 25,
+    monthlyBudget: user?.family?.monthlyBudget ? String(user.family.monthlyBudget) : '',
   });
 
   const [confirmDisband, setConfirmDisband] = useState(false);
@@ -100,6 +101,7 @@ export default function FamilyPage() {
         familyId: user.family.id,
         name: settingsForm.name,
         billingDate: settingsForm.billingDate,
+        monthlyBudget: settingsForm.monthlyBudget ? Number(settingsForm.monthlyBudget) : null,
         requestEmail: user.email,
       });
       showToast('Cập nhật thiết lập thành công!', 'success');
@@ -121,9 +123,9 @@ export default function FamilyPage() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
       className="space-y-8"
     >
       <header>
@@ -294,6 +296,9 @@ export default function FamilyPage() {
                 setSettingsForm({
                   name: user.family.name,
                   billingDate: user.family.billingDate,
+                  monthlyBudget: user.family.monthlyBudget
+                    ? String(user.family.monthlyBudget)
+                    : '',
                 });
                 setIsSettingsModalOpen(true);
               }}
@@ -302,6 +307,17 @@ export default function FamilyPage() {
               Thay đổi thiết lập
             </button>
           )}
+
+          <div className="pt-5 border-t border-ink-band-rule space-y-2">
+            <p className="text-xs font-medium text-ink-band-muted">
+              Ngân sách chi tiêu tháng
+            </p>
+            <p className="font-display text-lg font-bold text-paper num">
+              {user.family.monthlyBudget
+                ? formatCurrency(Number(user.family.monthlyBudget))
+                : 'Chưa thiết lập'}
+            </p>
+          </div>
 
           <div className="pt-5 border-t border-ink-band-rule space-y-2">
             <p className="text-xs font-medium text-ink-band-muted">
@@ -387,6 +403,30 @@ export default function FamilyPage() {
                       setSettingsForm({ ...settingsForm, name: e.target.value })
                     }
                     className="ff-input font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="settings-family-budget"
+                    className="block text-sm font-medium text-ink-2 mb-1.5"
+                  >
+                    Ngân sách chi tiêu tháng (VND, tùy chọn)
+                  </label>
+                  <input
+                    id="settings-family-budget"
+                    type="number"
+                    min="0"
+                    step="10000"
+                    placeholder="VD: 5000000 (để trống nếu không giới hạn)"
+                    value={settingsForm.monthlyBudget}
+                    onChange={(e) =>
+                      setSettingsForm({
+                        ...settingsForm,
+                        monthlyBudget: e.target.value,
+                      })
+                    }
+                    className="ff-input font-outlier num [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
 

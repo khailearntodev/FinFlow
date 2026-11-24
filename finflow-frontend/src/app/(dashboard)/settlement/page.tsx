@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { createPortal } from 'react-dom';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
-import { settlementService } from '@/services/api';
+import { settlementService, getErrorMessage } from '@/services/api';
 import { formatCurrency, cn } from '@/lib/utils';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   CreditCard,
   CheckCircle2,
@@ -20,15 +22,22 @@ import {
   Calendar,
   ExternalLink,
   Bell,
+  QrCode,
+  FileText,
+  X,
+  Copy,
 } from 'lucide-react';
 
-export default function SettlementPage() {
+function SettlementContent() {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const searchParams = useSearchParams();
   const [settlements, setSettlements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [qrBill, setQrBill] = useState<any | null>(null);
+  const [breakdownBillId, setBreakdownBillId] = useState<string | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -43,6 +52,21 @@ export default function SettlementPage() {
     type: 'info',
   });
   const [isConfirming, setIsConfirming] = useState(false);
+
+  // Support deep-link /settlement?month=10&year=2026 from emails
+  useEffect(() => {
+    const monthParam = parseInt(searchParams.get('month') || '', 10);
+    const yearParam = parseInt(searchParams.get('year') || '', 10);
+    if (!Number.isNaN(monthParam) && monthParam >= 1 && monthParam <= 12 && !Number.isNaN(yearParam) && yearParam >= 2020) {
+      if (monthParam === 12) {
+        setSelectedMonth(1);
+        setSelectedYear(yearParam + 1);
+      } else {
+        setSelectedMonth(monthParam + 1);
+        setSelectedYear(yearParam);
+      }
+    }
+  }, [searchParams]);
 
   const fetchSettlements = async () => {
     if (!user?.family?.id) {
@@ -171,9 +195,9 @@ export default function SettlementPage() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
       className="space-y-8"
     >
       <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
@@ -182,7 +206,7 @@ export default function SettlementPage() {
             Thanh toán và công nợ
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Theo dõi và tất toán các khoản chi tiêu định kỳ theo từng tháng.
+            Theo dõi, xem giải trình chi tiết và quét VietQR để tất toán định kỳ.
           </p>
         </div>
 
@@ -206,7 +230,7 @@ export default function SettlementPage() {
               onChange={(e) => setSelectedYear(parseInt(e.target.value))}
               className="flex-1 min-h-[44px] px-3.5 bg-transparent text-sm font-outlier font-medium text-ink outline-none border-l border-rule num"
             >
-              {[2024, 2025, 2026].map((y) => (
+              {[2024, 2025, 2026, 2027].map((y) => (
                 <option key={y} value={y}>
                   {y}
                 </option>
@@ -229,7 +253,6 @@ export default function SettlementPage() {
 
       {currentSettlement ? (
         <div className="space-y-6">
-          {/* Period Summary Band */}
           <section className="ff-ink-panel p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <p className="text-xs font-medium text-ink-band-muted">
@@ -282,7 +305,6 @@ export default function SettlementPage() {
             </div>
           </section>
 
-          {/* Individual Bills Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {currentSettlement.bills.map((bill: any) => (
               <BillCard
@@ -290,6 +312,8 @@ export default function SettlementPage() {
                 bill={bill}
                 isHead={isHead}
                 onUpdate={fetchSettlements}
+                onOpenQr={() => setQrBill(bill)}
+                onOpenBreakdown={() => setBreakdownBillId(bill.id)}
               />
             ))}
           </div>
@@ -308,6 +332,21 @@ export default function SettlementPage() {
         </div>
       )}
 
+      <AnimatePresence>
+        {qrBill && (
+          <VietQrModal bill={qrBill} onClose={() => setQrBill(null)} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {breakdownBillId && (
+          <BillBreakdownModal
+            billId={breakdownBillId}
+            onClose={() => setBreakdownBillId(null)}
+          />
+        )}
+      </AnimatePresence>
+
       <ConfirmModal
         isOpen={confirmModal.isOpen}
         onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
@@ -321,7 +360,22 @@ export default function SettlementPage() {
   );
 }
 
-const BillCard = ({ bill, isHead, onUpdate }: any) => {
+export default function SettlementPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-6" aria-busy="true">
+          <div className="h-10 w-64 rounded-input bg-paper-3/70 animate-pulse motion-reduce:animate-none" />
+          <div className="ff-surface h-72 animate-pulse motion-reduce:animate-none" />
+        </div>
+      }
+    >
+      <SettlementContent />
+    </Suspense>
+  );
+}
+
+const BillCard = ({ bill, isHead, onUpdate, onOpenQr, onOpenBreakdown }: any) => {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [uploading, setUploading] = useState(false);
@@ -391,6 +445,10 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
   };
 
   const config = statusConfig[bill.status as keyof typeof statusConfig];
+  const canShowQr =
+    bill.status !== 'COMPLETED' &&
+    bill.qrImageUrl &&
+    ((isMyBill && isDebtor) || (isHead && isCreditor));
 
   return (
     <article
@@ -430,7 +488,6 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
           </span>
         </div>
 
-        {/* Amount Ledger Row (No nested card, clean hairline separation) */}
         <div className="mt-5 pt-5 border-t border-rule">
           <p className="text-xs font-medium text-muted">Số tiền tất toán</p>
           <p
@@ -463,8 +520,29 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
         </div>
       </div>
 
-      {/* Action Footer */}
       <div className="mt-6 pt-4 border-t border-rule space-y-2.5">
+        <div className="grid grid-cols-1 gap-2">
+          <button
+            type="button"
+            onClick={onOpenBreakdown}
+            className="ff-btn-secondary w-full"
+          >
+            <FileText className="h-4 w-4" aria-hidden="true" />
+            <span>Xem giải trình</span>
+          </button>
+
+          {canShowQr && (
+            <button
+              type="button"
+              onClick={onOpenQr}
+              className="ff-btn-secondary w-full"
+            >
+              <QrCode className="h-4 w-4 text-accent" aria-hidden="true" />
+              <span>Quét mã VietQR</span>
+            </button>
+          )}
+        </div>
+
         {bill.proofImageUrl && (
           <a
             href={bill.proofImageUrl}
@@ -479,16 +557,18 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
 
         {isMyBill && !isHead && isDebtor && bill.status === 'PENDING' && (
           <div className="space-y-2.5">
-            <p className="text-xs text-muted bg-paper-2 px-3 py-2 rounded-input">
-              Vui lòng chuyển{' '}
-              <strong className="font-semibold text-ink num">
-                {formatCurrency(bill.amount)}
-              </strong>{' '}
-              cho Chủ hộ và tải biên lai.
-            </p>
+            {!bill.qrImageUrl && (
+              <p className="text-xs text-muted bg-paper-2 px-3 py-2 rounded-input">
+                Vui lòng chuyển{' '}
+                <strong className="font-semibold text-ink num">
+                  {formatCurrency(bill.amount)}
+                </strong>{' '}
+                cho Chủ hộ và tải biên lai.
+              </p>
+            )}
             <label className="ff-btn-primary w-full cursor-pointer">
               <Upload className="h-4 w-4" aria-hidden="true" />
-              <span>{uploading ? 'Đang tải...' : 'Nộp minh chứng thanh toán'}</span>
+              <span>{uploading ? 'Đang tải…' : 'Nộp minh chứng thanh toán'}</span>
               <input
                 type="file"
                 className="visually-hidden"
@@ -523,7 +603,7 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
                 ) : (
                   <Check className="h-4 w-4" aria-hidden="true" />
                 )}
-                <span>{confirming ? 'Đang xử lý...' : 'Xác nhận đã nhận tiền'}</span>
+                <span>{confirming ? 'Đang xử lý…' : 'Xác nhận đã nhận tiền'}</span>
               </button>
             )}
 
@@ -539,7 +619,7 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
                 ) : (
                   <Check className="h-4 w-4" aria-hidden="true" />
                 )}
-                <span>{confirming ? 'Đang xử lý...' : 'Xác nhận đã nộp vào quỹ'}</span>
+                <span>{confirming ? 'Đang xử lý…' : 'Xác nhận đã nộp vào quỹ'}</span>
               </button>
             )}
 
@@ -557,7 +637,7 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
                 )}
                 <span>
                   {confirming
-                    ? 'Đang xử lý...'
+                    ? 'Đang xử lý…'
                     : `Xác nhận đã trả ${bill.fullName.split(' ').pop()}`}
                 </span>
               </button>
@@ -576,7 +656,7 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
                   ) : (
                     <Bell className="h-4 w-4" aria-hidden="true" />
                   )}
-                  <span>{reminding ? 'Đang gửi...' : 'Nhắc đóng tiền qua Email'}</span>
+                  <span>{reminding ? 'Đang gửi…' : 'Nhắc đóng tiền qua Email'}</span>
                 </button>
                 <p className="text-xs text-muted text-center">
                   Đang chờ {bill.fullName.split(' ').pop()} nộp minh chứng.
@@ -587,5 +667,273 @@ const BillCard = ({ bill, isHead, onUpdate }: any) => {
         )}
       </div>
     </article>
+  );
+};
+
+const VietQrModal = ({ bill, onClose }: { bill: any; onClose: () => void }) => {
+  const { showToast } = useToast();
+
+  const copyText = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    showToast(`Đã sao chép ${label}`, 'success');
+  };
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.16 }}
+      className="fixed inset-0 z-[450] flex items-center justify-center p-4 bg-ink/45"
+      onClick={onClose}
+    >
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="vietqr-modal-title"
+        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.98 }}
+        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md rounded-card bg-surface border border-rule shadow-lift overflow-hidden"
+      >
+        <div className="px-6 py-4 border-b border-rule bg-paper-2/60 flex items-center justify-between">
+          <h2 id="vietqr-modal-title" className="font-display text-lg font-bold text-ink">
+            Mã VietQR chuyển khoản
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Đóng mã QR"
+            className="flex h-9 w-9 items-center justify-center rounded-input text-muted hover:bg-paper-3 hover:text-ink transition-colors"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          <div className="flex justify-center bg-paper p-4 rounded-input">
+            <img
+              src={bill.qrImageUrl}
+              alt="Mã VietQR chuyển khoản"
+              className="w-64 h-auto max-w-full rounded-input"
+            />
+          </div>
+
+          <dl className="divide-y divide-rule text-sm">
+            <div className="py-2.5 flex items-center justify-between gap-2">
+              <dt className="text-muted">Ngân hàng</dt>
+              <dd className="font-semibold text-ink">{bill.recipientBankCode}</dd>
+            </div>
+            <div className="py-2.5 flex items-center justify-between gap-2">
+              <dt className="text-muted">Số tài khoản</dt>
+              <dd className="flex items-center gap-2">
+                <span className="font-outlier font-medium text-ink num">
+                  {bill.recipientAccountNumber}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Sao chép số tài khoản"
+                  onClick={() => copyText(bill.recipientAccountNumber, 'số tài khoản')}
+                  className="p-1.5 rounded-input text-muted hover:text-accent hover:bg-accent-soft/50 transition-colors"
+                >
+                  <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </dd>
+            </div>
+            {bill.recipientAccountName && (
+              <div className="py-2.5 flex items-center justify-between gap-2">
+                <dt className="text-muted">Chủ tài khoản</dt>
+                <dd className="font-semibold text-ink">{bill.recipientAccountName}</dd>
+              </div>
+            )}
+            <div className="py-2.5 flex items-center justify-between gap-2">
+              <dt className="text-muted">Số tiền</dt>
+              <dd className="font-display font-bold text-accent num">
+                {formatCurrency(Math.abs(bill.amount))}
+              </dd>
+            </div>
+            {bill.transferContent && (
+              <div className="py-2.5 flex items-center justify-between gap-2">
+                <dt className="text-muted shrink-0">Nội dung</dt>
+                <dd className="flex items-center gap-2 min-w-0">
+                  <span className="font-outlier text-xs text-ink truncate">
+                    {bill.transferContent}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Sao chép nội dung chuyển khoản"
+                    onClick={() => copyText(bill.transferContent, 'nội dung chuyển khoản')}
+                    className="p-1.5 rounded-input text-muted hover:text-accent hover:bg-accent-soft/50 transition-colors shrink-0"
+                  >
+                    <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                </dd>
+              </div>
+            )}
+          </dl>
+        </div>
+      </motion.div>
+    </motion.div>,
+    document.body
+  );
+};
+
+const BillBreakdownModal = ({
+  billId,
+  onClose,
+}: {
+  billId: string;
+  onClose: () => void;
+}) => {
+  const { showToast } = useToast();
+  const [data, setData] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const res = await settlementService.getBillBreakdown(billId);
+        if (active) setData(res.data);
+      } catch (err) {
+        showToast(getErrorMessage(err), 'error');
+        onClose();
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    load();
+    return () => {
+      active = false;
+    };
+  }, [billId, onClose, showToast]);
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.16 }}
+      className="fixed inset-0 z-[450] overflow-y-auto bg-ink/45 p-4 flex items-start md:items-center justify-center"
+      onClick={onClose}
+    >
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="breakdown-modal-title"
+        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.98 }}
+        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-2xl rounded-card bg-surface border border-rule shadow-lift overflow-hidden my-auto"
+      >
+        <div className="px-6 py-4 border-b border-rule bg-paper-2/60 flex items-center justify-between gap-4">
+          <div>
+            <h2 id="breakdown-modal-title" className="font-display text-lg font-bold text-ink">
+              Bảng kê giải trình công nợ
+            </h2>
+            {data && (
+              <p className="text-xs text-muted mt-0.5 num">
+                {data.memberFullName} · Kỳ tháng {data.month}/{data.year}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Đóng bảng giải trình"
+            className="flex h-9 w-9 items-center justify-center rounded-input text-muted hover:bg-paper-3 hover:text-ink transition-colors"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {loading ? (
+            <div className="py-12 text-center">
+              <Loader2 className="h-6 w-6 animate-spin text-accent mx-auto motion-reduce:animate-none" aria-hidden="true" />
+              <p className="mt-3 text-sm text-muted">Đang tải bảng kê chi tiết…</p>
+            </div>
+          ) : data ? (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-rule rounded-input bg-paper-2">
+                <div className="p-4">
+                  <p className="text-xs text-muted">Tổng đã ứng trước</p>
+                  <p className="mt-1 font-display text-lg font-bold text-success num">
+                    {formatCurrency(data.totalPaid)}
+                  </p>
+                </div>
+                <div className="p-4">
+                  <p className="text-xs text-muted">Tổng phần phải chịu</p>
+                  <p className="mt-1 font-display text-lg font-bold text-ink num">
+                    {formatCurrency(data.totalOwed)}
+                  </p>
+                </div>
+                <div className="p-4">
+                  <p className="text-xs text-muted">
+                    {data.netAmount > 0 ? 'Cần đóng về quỹ' : 'Nhận lại từ quỹ'}
+                  </p>
+                  <p
+                    className={cn(
+                      'mt-1 font-display text-lg font-bold num',
+                      data.netAmount > 0 ? 'text-error' : 'text-success'
+                    )}
+                  >
+                    {data.netAmount > 0 ? '+' : ''}
+                    {formatCurrency(data.netAmount)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="max-h-80 overflow-y-auto border border-rule rounded-input">
+                <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                  <thead className="bg-paper-2/70 border-b border-rule sticky top-0">
+                    <tr>
+                      <th className="px-4 py-2.5 font-semibold text-muted">Khoản chi</th>
+                      <th className="px-4 py-2.5 font-semibold text-muted text-right">Đã ứng</th>
+                      <th className="px-4 py-2.5 font-semibold text-muted text-right">Phần chia</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-rule">
+                    {data.items.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="px-4 py-8 text-center text-muted">
+                          Không có khoản chi nào phát sinh trong kỳ này.
+                        </td>
+                      </tr>
+                    ) : (
+                      data.items.map((item: any) => (
+                        <tr key={item.expenseId}>
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-ink">{item.title}</p>
+                            <p className="text-xs text-muted mt-0.5 num">
+                              {item.expenseDate} ({item.paidByName} chi {formatCurrency(item.totalExpenseAmount)}, chia {item.participantCount})
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 text-right font-outlier num text-success-ink">
+                            {item.myPaidAmount > 0 ? formatCurrency(item.myPaidAmount) : '0 ₫'}
+                          </td>
+                          <td className="px-4 py-3 text-right font-outlier num text-ink">
+                            {formatCurrency(item.myShareAmount)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
+        </div>
+      </motion.div>
+    </motion.div>,
+    document.body
   );
 };

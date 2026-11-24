@@ -34,7 +34,7 @@ public class FamilyService {
     @Transactional
     public FamilyResponse createFamily(FamilyCreateRequest familyCreateRequest) {
         User creator = userRepository.findByEmail(familyCreateRequest.getCreatorEmail())
-                .orElseThrow(()-> new FamilyException("Không tìm thấy người tạo"));
+                .orElseThrow(()-> new FamilyException("Hong tìm thấy người tạo đâu hết á!"));
 
         if (creator.getFamily() != null) throw new FamilyException("Người đàng quàng không có 2 gia đình");
 
@@ -59,16 +59,16 @@ public class FamilyService {
     @Transactional
     public void deleteFamily(UUID id, String requestEmail) {
         User deleter = userRepository.findByEmail(requestEmail)
-                .orElseThrow(()-> new FamilyException("Không tìm thấy người dùng"));
+                .orElseThrow(()-> new FamilyException("Hong tìm thấy tài khoản của bạn đâu ròi!"));
 
         if (deleter.getFamily() == null) {
-            throw new IllegalArgumentException("Bạn chưa tham gia gia đình nào!");
+            throw new IllegalArgumentException("Bạn đã vô gia đình nào đâu mà xóa nè!");
         }
         if (!deleter.getFamily().getId().equals(id)) {
-            throw new IllegalArgumentException("Bạn không thể xóa gia đình của người khác!");
+            throw new IllegalArgumentException("Bịp nha, gia đình người ta mà đòi xóa!");
         }
         if (deleter.getRole() != RoleEnum.HEAD) {
-            throw new IllegalArgumentException("Chỉ có Chủ hộ mới có quyền xóa gia đình!");
+            throw new IllegalArgumentException("Chỉ có Chủ hộ mới được giải tán gia đình nha!");
         }
 
         Family familyToDelete = deleter.getFamily();
@@ -98,20 +98,20 @@ public class FamilyService {
         UUID familyId = addMemberRequest.getFamilyId();
         String adderEmail = addMemberRequest.getAdderEmail();
 
-        Family family = familyRepository.findById(familyId).orElseThrow(() -> new FamilyException("Không tìm thấy gia đình"));
+        Family family = familyRepository.findById(familyId).orElseThrow(() -> new FamilyException("Hong thấy gia đình này đâu ròi!"));
 
-        User head = userRepository.findByEmail(adderEmail).orElseThrow(()-> new FamilyException("Không tìm thấy chủ hộ"));
+        User head = userRepository.findByEmail(adderEmail).orElseThrow(()-> new FamilyException("Hong tìm thấy Chủ hộ đâu hết á!"));
         if (head.getRole() != RoleEnum.HEAD || !family.getMembers().contains(head)) {
-            throw new FamilyException("Chỉ chủ hộ mới được thêm thành viên");
+            throw new FamilyException("Chỉ Chủ hộ mới được mời thêm người vô nhà nha!");
         }
 
         for (String email: emails) {
-            User newMember = userRepository.findByEmail(email).orElseThrow(() -> new FamilyException("Người dùng " + email + " không tồn tại\n"));
+            User newMember = userRepository.findByEmail(email).orElseThrow(() -> new FamilyException("Email " + email + " chưa có tài khoản á, kêu bạn tạo trước đi nha!"));
             if (newMember.getRole() != RoleEnum.USER){
-                throw new FamilyException("Người được thêm vào gia đình phải là thành viên");
+                throw new FamilyException("Người này đang làm Chủ hộ nhà khác ròi, hong mời được nha!");
             }
             if (newMember.getFamily() != null) {
-                throw new FamilyException("Người được mời không được ở gia đình khác");
+                throw new FamilyException("Người này có gia đình ròi, bịp nha, kêu rời nhà cũ trước đi!");
             }
             newMember.setFamily(family);
             newMember.setRole(RoleEnum.USER);
@@ -128,11 +128,11 @@ public class FamilyService {
         UUID familyId = revokeMemberRequest.getFamilyId();
         String adderEmail = revokeMemberRequest.getAdderEmail();
 
-        Family family = familyRepository.findById(familyId).orElseThrow(() -> new FamilyException("Không tìm thấy gia đình"));
+        Family family = familyRepository.findById(familyId).orElseThrow(() -> new FamilyException("Hong thấy gia đình này đâu ròi!"));
 
-        User head = userRepository.findByEmail(adderEmail).orElseThrow(()-> new FamilyException("Không tìm thấy chủ hộ"));
+        User head = userRepository.findByEmail(adderEmail).orElseThrow(()-> new FamilyException("Hong tìm thấy Chủ hộ đâu hết á!"));
         if (head.getRole() != RoleEnum.HEAD || !family.getMembers().contains(head)) {
-            throw new FamilyException("Chỉ chủ hộ mới được xóa thành viên");
+            throw new FamilyException("Chỉ Chủ hộ mới có quyền mời người ra khỏi nhà nha!");
         }
 
         List<User> evictedMembers = new ArrayList<>();
@@ -141,18 +141,18 @@ public class FamilyService {
             if (userRepository.findByEmail(email).isPresent()) {
                 User member = userRepository.findByEmail(email).get();
                 if (member.getRole() != RoleEnum.USER || !family.getMembers().contains(member)){
-                    throw new FamilyException("Người được xóa không phải là thành viên gia đình");
+                    throw new FamilyException("Bịp nha, người này đâu phải thành viên nhà mình!");
                 }
 
                 if (expenseRepository.hasPendingExpenses(familyId, member.getId().toString(), member.getId())) {
-                    throw new FamilyException("Không thể xóa " + member.getFullName() + " vì người này vẫn còn khoản chi chưa kết sổ!");
+                    throw new FamilyException("Khoan nha, " + member.getFullName() + " còn khoản chi chưa chốt sổ á, chốt cho ok ròi hãy xóa!");
                 }
 
                 member.setFamily(null);
                 family.getMembers().remove(member);
                 evictedMembers.add(member);
             }
-            else throw new FamilyException("Người dùng " + email + " không tồn tại\n");
+            else throw new FamilyException("Email " + email + " hong tồn tại đâu nha!");
         }
 
         familyRepository.save(family);
@@ -162,17 +162,22 @@ public class FamilyService {
     @Transactional
     public FamilyResponse updateFamily(FamilyUpdateRequest updateRequest) {
         Family family = familyRepository.findById(UUID.fromString(updateRequest.getFamilyId()))
-                .orElseThrow(() -> new FamilyException("Không tìm thấy gia đình"));
+                .orElseThrow(() -> new FamilyException("Hong thấy gia đình này đâu ròi!"));
 
         User head = userRepository.findByEmail(updateRequest.getRequestEmail())
-                .orElseThrow(() -> new FamilyException("Không tìm thấy người dùng thực hiện yêu cầu"));
+                .orElseThrow(() -> new FamilyException("Hong tìm thấy người thực hiện đâu hết á!"));
 
         if (head.getRole() != RoleEnum.HEAD || !family.getMembers().contains(head)) {
-            throw new FamilyException("Chỉ chủ hộ mới có quyền thay đổi thiết lập gia đình");
+            throw new FamilyException("Chỉ Chủ hộ mới được đổi thiết lập gia đình nha!");
         }
 
         family.setName(updateRequest.getName());
         family.setBillingDate(updateRequest.getBillingDate());
+        if (updateRequest.getMonthlyBudget() != null && updateRequest.getMonthlyBudget().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            family.setMonthlyBudget(null);
+        } else {
+            family.setMonthlyBudget(updateRequest.getMonthlyBudget());
+        }
         familyRepository.save(family);
 
         return FamilyResponse.builder()

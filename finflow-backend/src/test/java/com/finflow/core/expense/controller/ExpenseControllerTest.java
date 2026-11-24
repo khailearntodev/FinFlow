@@ -3,6 +3,7 @@ package com.finflow.core.expense.controller;
 import com.finflow.core.enums.ExpenseStatus;
 import com.finflow.core.exception.ExpenseException;
 import com.finflow.core.exception.GlobalExceptionHandler;
+import com.finflow.core.expense.dto.ExpenseAnalyticsResponse;
 import com.finflow.core.expense.dto.ExpenseCreateRequest;
 import com.finflow.core.expense.dto.ExpenseResponse;
 import com.finflow.core.expense.service.ExpenseService;
@@ -233,5 +234,27 @@ class ExpenseControllerTest {
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
                         containsString("Chi_Tieu_Thang_11_2026.xlsx")))
                 .andExpect(content().bytes(fakeXlsx));
+    }
+
+    @Test
+    @DisplayName("GET /api/expense/analytics returns 6-month analytics and budget metrics")
+    void getAnalytics_returnsAnalyticsResponse() throws Exception {
+        UUID familyId = UUID.randomUUID();
+        ExpenseAnalyticsResponse response = ExpenseAnalyticsResponse.builder()
+                .currentMonthTotal(new BigDecimal("500000"))
+                .monthlyBudget(new BigDecimal("1000000"))
+                .budgetUsagePercent(50.0)
+                .budgetStatus("SAFE")
+                .monthlyTrend(List.of())
+                .categoryBreakdown(List.of())
+                .build();
+
+        when(expenseService.getAnalytics(familyId, 6)).thenReturn(response);
+
+        mockMvc.perform(get("/api/expense/analytics")
+                        .param("familyId", familyId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.budgetStatus").value("SAFE"))
+                .andExpect(jsonPath("$.budgetUsagePercent").value(50.0));
     }
 }

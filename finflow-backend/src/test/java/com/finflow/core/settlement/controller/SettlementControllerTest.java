@@ -4,6 +4,7 @@ import com.finflow.core.enums.SettlementBillStatusEnum;
 import com.finflow.core.enums.SettlementStatusEnum;
 import com.finflow.core.exception.GlobalExceptionHandler;
 import com.finflow.core.exception.SettlementException;
+import com.finflow.core.settlement.dto.BillBreakdownResponse;
 import com.finflow.core.settlement.dto.BillDetail;
 import com.finflow.core.settlement.dto.SettlementCreateRequest;
 import com.finflow.core.settlement.dto.SettlementResponse;
@@ -219,5 +220,30 @@ class SettlementControllerTest {
                 .andExpect(content().string("Đã gửi email nhắc nhở"));
 
         verify(settlementService).remindPayment(billId, "head@gmail.com");
+    }
+
+    @Test
+    @DisplayName("GET /api/settlement/bills/{billId}/breakdown returns bill breakdown")
+    void getBillBreakdown_valid_returnsBreakdownResponse() throws Exception {
+        UUID billId = UUID.randomUUID();
+        BillBreakdownResponse breakdown = BillBreakdownResponse.builder()
+                .billId(billId)
+                .settlementId(UUID.randomUUID())
+                .month(10)
+                .year(2026)
+                .memberFullName("Nguyễn Quang Khải")
+                .memberEmail("khai@gmail.com")
+                .totalPaid(new BigDecimal("100000"))
+                .totalOwed(new BigDecimal("585983"))
+                .netAmount(new BigDecimal("485983"))
+                .items(List.of())
+                .build();
+
+        when(settlementService.getBillBreakdown(billId)).thenReturn(breakdown);
+
+        mockMvc.perform(get("/api/settlement/bills/{billId}/breakdown", billId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.memberFullName").value("Nguyễn Quang Khải"))
+                .andExpect(jsonPath("$.netAmount").value(485983));
     }
 }

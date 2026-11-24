@@ -97,7 +97,7 @@ export default function LoginPage() {
           className="w-full max-w-[420px]"
         >
           <div className="mb-8 lg:hidden">
-            <Logo className="h-10 max-w-[150px]" />
+            <Logo className="h-10 w-[150px]" />
           </div>
 
           <div className="ff-surface p-7 sm:p-9 shadow-card">

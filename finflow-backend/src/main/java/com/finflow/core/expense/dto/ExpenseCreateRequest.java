@@ -1,5 +1,6 @@
 package com.finflow.core.expense.dto;
 
+import com.finflow.core.enums.ExpenseCategory;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -33,4 +34,6 @@ public class ExpenseCreateRequest {
     @NotNull(message = "Danh sách người tham gia không được trống")
     @Size(min = 2, message = "phải có ít nhất 2 người tham gia chia tiền")
     private List<UUID> participantIDs;
+
+    private ExpenseCategory category;
 }

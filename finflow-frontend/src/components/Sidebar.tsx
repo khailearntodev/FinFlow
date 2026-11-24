@@ -39,8 +39,8 @@ export const Sidebar = () => {
     <>
       {/* Mobile Header Bar */}
       <div className="lg:hidden fixed top-0 inset-x-0 z-[310] h-16 bg-surface border-b border-rule px-4 flex items-center justify-between">
-        <Link href="/dashboard" onClick={() => setIsOpen(false)} className="flex items-center">
-          <Logo className="h-9 max-w-[132px]" />
+        <Link href="/dashboard" onClick={() => setIsOpen(false)} className="flex items-center shrink-0">
+          <Logo className="h-9 w-[132px]" />
         </Link>
         <button
           type="button"
