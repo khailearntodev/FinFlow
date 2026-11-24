@@ -332,14 +332,13 @@ public class SettlementService {
         return "Xác nhận thanh toán thành công!";
     }
 
-    @Transactional
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<SettlementResponse> getSettlementsByFamilyId(UUID familyId) {
         List<Settlement> allSettlements = settlementRepository.findByFamilyId(familyId);
-        
-        // Fetch all family members once to avoid N+1 query loop
-        Map<UUID, User> membersMap = familyRepository.findById(familyId)
-                .map(f -> f.getMembers().stream().collect(Collectors.toMap(User::getId, u -> u)))
-                .orElse(new HashMap<>());
+
+        // Fetch all family members in one query to avoid N+1 and extra family lookup
+        Map<UUID, User> membersMap = userRepository.findByFamilyId(familyId).stream()
+                .collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a));
         
         Map<String, Settlement> bestSettlements = new HashMap<>();
         for (Settlement s : allSettlements) {
@@ -384,7 +383,7 @@ public class SettlementService {
                 .toList();
     }
 
-    @Transactional
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<BillDetail> getBillsByUserId(UUID userId) {
         User user = userRepository.findById(userId).orElse(null);
         return settlementBillRepository.findByUserId(userId).stream()

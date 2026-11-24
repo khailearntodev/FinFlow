@@ -7,6 +7,9 @@ import com.finflow.core.settlement.service.SettlementService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
@@ -16,6 +19,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class AuditService {
+    private static final int MAX_PAGE_SIZE = 50;
+
     private final AuditLogRepository auditLogRepository;
     private final SettlementService settlementService;
     private final com.finflow.core.family.repository.UserRepository userRepository;
@@ -49,7 +54,14 @@ public class AuditService {
     }
 
     @Transactional
-    public java.util.List<AuditLog> getLogsByFamilyId(UUID familyId) {
-        return auditLogRepository.findByFamilyId(familyId);
+    public Page<AuditLog> getLogsByFamilyId(UUID familyId, int page, int size, String search) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        Pageable pageable = PageRequest.of(safePage, safeSize);
+
+        if (search != null && !search.trim().isEmpty()) {
+            return auditLogRepository.searchByFamilyId(familyId, search.trim(), pageable);
+        }
+        return auditLogRepository.findByFamilyIdOrderByCreatedAtDesc(familyId, pageable);
     }
 }

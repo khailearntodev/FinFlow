@@ -1,8 +1,10 @@
 'use client';
 
-import { Fragment } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { AlertTriangle, Info, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -23,74 +25,106 @@ export function ConfirmModal({
   message,
   confirmText = 'Xác nhận',
   type = 'danger',
-  isLoading = false
+  isLoading = false,
 }: ConfirmModalProps) {
-  const buttonColor = type === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700';
+  const [mounted, setMounted] = useState(false);
+  const isDanger = type === 'danger';
+  const isWarning = type === 'warning';
 
-  return (
-    <Transition.Root show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-[110]" onClose={onClose}>
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isLoading) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isLoading, onClose]);
+
+  if (!mounted) return null;
+
+  return createPortal(
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.16 }}
+          className="fixed inset-0 z-[450] flex items-end sm:items-center justify-center p-4 sm:p-6 bg-ink/45"
+          onClick={() => {
+            if (!isLoading) onClose();
+          }}
         >
-          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
-        </Transition.Child>
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-modal-title"
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-md overflow-hidden rounded-card bg-surface border border-rule p-6 text-left shadow-lift"
+          >
+            <div className="flex items-start gap-4">
+              <div
+                className={cn(
+                  'flex h-11 w-11 shrink-0 items-center justify-center rounded-input',
+                  isDanger
+                    ? 'bg-error-soft text-error'
+                    : isWarning
+                      ? 'bg-warning-soft text-warning'
+                      : 'bg-accent-soft text-accent'
+                )}
+              >
+                {type === 'info' ? (
+                  <Info className="h-5 w-5" aria-hidden="true" />
+                ) : (
+                  <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 id="confirm-modal-title" className="font-display text-lg font-bold text-ink">
+                  {title}
+                </h3>
+                <p className="mt-2 text-sm text-ink-2 leading-relaxed">{message}</p>
+              </div>
+            </div>
 
-        <div className="fixed inset-0 z-10 overflow-y-auto">
-          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-              enterTo="opacity-100 translate-y-0 sm:scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 translate-y-0 sm:scale-100"
-              leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-            >
-              <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
-                <div className="sm:flex sm:items-start">
-                  <div className={`mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full ${type === 'danger' ? 'bg-red-100' : 'bg-blue-100'} sm:mx-0 sm:h-10 sm:w-10`}>
-                    <ExclamationTriangleIcon className={`h-6 w-6 ${type === 'danger' ? 'text-red-600' : 'text-blue-600'}`} aria-hidden="true" />
-                  </div>
-                  <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
-                    <Dialog.Title as="h3" className="text-base font-semibold leading-6 text-gray-900">
-                      {title}
-                    </Dialog.Title>
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500">
-                        {message}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    className={`inline-flex w-full justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm sm:ml-3 sm:w-auto ${buttonColor} disabled:opacity-50`}
-                    onClick={onConfirm}
-                  >
-                    {isLoading ? 'Đang xử lý...' : confirmText}
-                  </button>
-                  <button
-                    type="button"
-                    className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
-                    onClick={onClose}
-                  >
-                    Hủy
-                  </button>
-                </div>
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
-        </div>
-      </Dialog>
-    </Transition.Root>
+            <div className="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+              <button
+                type="button"
+                disabled={isLoading}
+                className="ff-btn-secondary w-full sm:w-auto"
+                onClick={onClose}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={isLoading}
+                className={cn(
+                  isDanger ? 'ff-btn-danger' : 'ff-btn-primary',
+                  'w-full sm:w-auto'
+                )}
+                onClick={onConfirm}
+              >
+                {isLoading && (
+                  <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                )}
+                <span>{isLoading ? 'Đang xử lý…' : confirmText}</span>
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body
   );
 }

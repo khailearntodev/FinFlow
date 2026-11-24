@@ -3,18 +3,16 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency, cn } from '@/lib/utils';
 import {
-  TrendingUp,
-  Wallet,
   Plus,
-  ArrowRight,
   Clock,
   Receipt,
   Users,
-  CreditCard,
-  Loader2
+  Calendar,
+  ArrowUpRight,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { expenseService, settlementService } from '@/services/api';
 
 export default function DashboardPage() {
@@ -32,7 +30,7 @@ export default function DashboardPage() {
       try {
         const [expRes, billRes] = await Promise.all([
           expenseService.getAll(user.family.id),
-          settlementService.getMyBills(user.id)
+          settlementService.getMyBills(user.id),
         ]);
         setExpenses(expRes.data);
         setMyBills(billRes.data);
@@ -47,180 +45,255 @@ export default function DashboardPage() {
 
   const currentMonth = new Date().toISOString().slice(0, 7);
 
-  const currentMonthExpenses = expenses.filter(e => e.expenseDate.startsWith(currentMonth));
-  const totalMonthlySpend = currentMonthExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const currentMonthExpenses = expenses.filter((e) =>
+    e.expenseDate.startsWith(currentMonth)
+  );
+  const totalMonthlySpend = currentMonthExpenses.reduce(
+    (sum, e) => sum + e.amount,
+    0
+  );
 
   const myTotalPaid = currentMonthExpenses
-    .filter(e => e.paidByEmail === user?.email)
+    .filter((e) => e.paidByEmail === user?.email)
     .reduce((sum, e) => sum + e.amount, 0);
 
-  // Stats calculation
-  const stats = [
-    { name: 'Tổng chi tiêu tháng', value: totalMonthlySpend, icon: Wallet, color: 'bg-blue-500', shadow: 'shadow-blue-200' },
-    { name: 'Đã ứng trước', value: myTotalPaid, icon: TrendingUp, color: 'bg-emerald-500', shadow: 'shadow-emerald-200' },
-    { name: 'Số thành viên', value: user?.family?.members?.length || 0, icon: Users, color: 'bg-indigo-500', shadow: 'shadow-indigo-200' },
-  ];
+  const memberCount = user?.family?.members?.length || 0;
 
-  const recentExpenses = expenses
-    .sort((a, b) => new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime())
+  const recentExpenses = [...expenses]
+    .sort(
+      (a, b) =>
+        new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime()
+    )
     .slice(0, 5);
 
-  const pendingSettlement = myBills.find(b => b.status === 'PENDING' || b.status === 'WAITING_FOR_CONFIRMATION');
+  const pendingSettlement = myBills.find(
+    (b) => b.status === 'PENDING' || b.status === 'WAITING_FOR_CONFIRMATION'
+  );
 
   if (!user?.family) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="mb-6 h-24 w-24 rounded-3xl bg-indigo-100 flex items-center justify-center text-indigo-600">
-          <Users className="h-12 w-12" />
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+        className="ff-surface p-10 sm:p-14 text-center max-w-xl mx-auto mt-8"
+      >
+        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-input bg-accent-soft text-accent">
+          <Users className="h-7 w-7" aria-hidden="true" />
         </div>
-        <h1 className="text-3xl font-extrabold text-slate-900">Chào mừng {user?.fullName}!</h1>
-        <p className="mt-4 text-slate-600 max-w-md">
-          Bạn chưa tham gia gia đình nào. Hãy tạo mới hoặc yêu cầu chủ hộ thêm bạn vào gia đình để bắt đầu.
+        <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink">
+          Chào mừng {user?.fullName}
+        </h1>
+        <p className="mt-3 text-sm text-muted max-w-[42ch] mx-auto leading-relaxed">
+          Bạn chưa tham gia gia đình nào. Hãy tạo nhóm mới hoặc yêu cầu chủ hộ thêm email của bạn vào gia đình để bắt đầu ghi sổ.
         </p>
-        <div className="mt-10 flex gap-4">
-          <Link href="/family" className="rounded-2xl bg-indigo-600 px-8 py-4 font-bold text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all">
+        <div className="mt-7 flex justify-center">
+          <Link href="/family" className="ff-btn-primary">
             Tạo gia đình mới
           </Link>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   if (loading) {
     return (
-      <div className="flex h-96 items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-indigo-600" />
+      <div className="space-y-8" aria-busy="true" aria-label="Đang tải tổng quan">
+        <div className="flex items-end justify-between gap-4">
+          <div className="space-y-2">
+            <div className="h-8 w-56 rounded-input bg-paper-3/70 animate-pulse motion-reduce:animate-none" />
+            <div className="h-4 w-72 rounded-input bg-paper-3/50 animate-pulse motion-reduce:animate-none" />
+          </div>
+          <div className="h-11 w-36 rounded-input bg-paper-3/70 animate-pulse motion-reduce:animate-none" />
+        </div>
+        <div className="ff-surface h-28 animate-pulse motion-reduce:animate-none" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-7 ff-surface h-80 animate-pulse motion-reduce:animate-none" />
+          <div className="lg:col-span-5 ff-ink-panel h-80 animate-pulse motion-reduce:animate-none" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-10">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Chào mừng, {user.fullName.split(' ').pop()}!</h1>
-          <p className="mt-2 text-slate-500 font-medium">Hôm nay là một ngày tuyệt vời để quản lý tài chính.</p>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+      className="space-y-8"
+    >
+      {/* Page Header */}
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink">
+            Xin chào, {user.fullName.split(' ').pop()}
+          </h1>
+          <p className="mt-1 text-sm text-muted">
+            Tổng quan sổ chi tiêu tháng {currentMonth.slice(5)}/{currentMonth.slice(0, 4)} của {user.family.name}.
+          </p>
         </div>
-        <Link
-          href="/expenses?action=create"
-          className="flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-6 py-4 font-bold text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 w-full md:w-auto"
-        >
-          <Plus className="h-5 w-5" />
-          Thêm chi tiêu
+        <Link href="/expenses?action=create" className="ff-btn-primary w-full sm:w-auto">
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          <span>Thêm chi tiêu</span>
         </Link>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map((stat) => (
-          <div key={stat.name} className="relative overflow-hidden rounded-3xl bg-white p-8 shadow-sm border border-slate-100 group hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300">
-            <div className={cn("absolute -right-4 -top-4 h-24 w-24 rounded-full opacity-10 transition-transform duration-500 group-hover:scale-150", stat.color)}></div>
-            <div className="relative flex items-start justify-between">
+      {/* Unified Ledger Stat Band */}
+      <section aria-label="Chỉ số tháng hiện tại" className="ff-surface shadow-card">
+        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-rule">
+          <div className="p-6">
+            <p className="text-sm font-medium text-muted">Tổng chi tiêu tháng</p>
+            <p className="mt-2 font-display text-2xl sm:text-3xl font-bold text-ink num">
+              {formatCurrency(totalMonthlySpend)}
+            </p>
+            <p className="mt-1.5 text-xs text-muted num">
+              {currentMonthExpenses.length} khoản ghi nhận trong tháng
+            </p>
+          </div>
+
+          <div className="p-6">
+            <p className="text-sm font-medium text-muted">Bạn đã ứng trước</p>
+            <p className="mt-2 font-display text-2xl sm:text-3xl font-bold text-accent num">
+              {formatCurrency(myTotalPaid)}
+            </p>
+            <p className="mt-1.5 text-xs text-muted">
+              Tính trên các khoản bạn trực tiếp chi trả
+            </p>
+          </div>
+
+          <div className="p-6">
+            <p className="text-sm font-medium text-muted">Thành viên gia đình</p>
+            <p className="mt-2 font-display text-2xl sm:text-3xl font-bold text-ink num">
+              {memberCount} người
+            </p>
+            <p className="mt-1.5 text-xs text-muted num">
+              Chốt sổ tự động ngày {user.family.billingDate} hàng tháng
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Main Split: Recent Ledger + Settlement Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <section className="lg:col-span-7 ff-surface shadow-card overflow-hidden">
+          <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-rule">
+            <h2 className="font-display text-lg font-bold text-ink">Chi tiêu gần đây</h2>
+            <Link
+              href="/expenses"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-accent hover:text-accent-deep underline-offset-4 hover:underline whitespace-nowrap transition-colors"
+            >
+              <span>Xem tất cả</span>
+              <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
+
+          {recentExpenses.length === 0 ? (
+            <div className="px-6 py-14 text-center">
+              <Receipt className="h-8 w-8 text-muted mx-auto mb-3" aria-hidden="true" />
+              <p className="text-sm font-medium text-ink-2">Chưa có khoản chi nào gần đây</p>
+              <p className="mt-1 text-xs text-muted">
+                Nhấn &ldquo;Thêm chi tiêu&rdquo; để bắt đầu ghi nhận khoản đầu tiên.
+              </p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-rule">
+              {recentExpenses.map((expense) => (
+                <li
+                  key={expense.id}
+                  className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-paper-2/60 transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-ink truncate">
+                      {expense.title}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
+                      <span className="font-outlier num">{expense.expenseDate}</span>
+                      <span>
+                        Người chi:{' '}
+                        <strong className="font-medium text-ink-2">
+                          {expense.paidByEmail === user.email
+                            ? 'Bạn'
+                            : expense.paidByEmail.split('@')[0]}
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
+                  <p className="font-display text-base font-bold text-ink num shrink-0">
+                    {formatCurrency(expense.amount)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="lg:col-span-5 ff-ink-panel p-6 sm:p-7 space-y-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="font-display text-lg font-bold text-paper">
+                Trạng thái chốt sổ
+              </h2>
+              <p className="mt-1 text-sm text-ink-band-muted">
+                {pendingSettlement
+                  ? `Kỳ tháng ${pendingSettlement.month}/${pendingSettlement.year}`
+                  : 'Hiện không có kỳ chốt sổ nào cần xử lý'}
+              </p>
+            </div>
+            <Calendar className="h-5 w-5 text-accent-soft shrink-0 mt-0.5" aria-hidden="true" />
+          </div>
+
+          {!pendingSettlement ? (
+            <div className="rounded-input bg-ink-band-2 border border-ink-band-rule p-4 flex items-start gap-3">
+              <Clock className="h-5 w-5 text-accent-soft shrink-0 mt-0.5" aria-hidden="true" />
               <div>
-                <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">{stat.name}</p>
-                <p className="mt-2 text-3xl font-black text-slate-900">
-                  {stat.name === 'Số thành viên' ? stat.value : formatCurrency(stat.value)}
+                <p className="text-sm font-semibold text-paper">Đang chờ đến kỳ chốt sổ</p>
+                <p className="mt-1 text-xs text-ink-band-muted num">
+                  Ngày chốt định kỳ: ngày {user.family.billingDate} hàng tháng
                 </p>
-              </div>
-              <div className={cn("rounded-2xl p-3 text-white shadow-lg", stat.color, stat.shadow)}>
-                <stat.icon className="h-6 w-6" />
               </div>
             </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        <section className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-black text-slate-900">Chi tiêu gần đây</h2>
-            <Link href="/expenses" className="text-sm font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 group">
-              Xem tất cả
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </Link>
-          </div>
-
-          <div className="space-y-4">
-            {recentExpenses.length === 0 ? (
-              <p className="py-10 text-center text-slate-400 font-medium italic">Chưa có chi tiêu nào gần đây.</p>
-            ) : recentExpenses.map((expense) => (
-              <div key={expense.id} className="flex items-center justify-between p-4 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
-                    <Receipt className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-900">{expense.title}</p>
-                    <p className="text-xs font-medium text-slate-500">{expense.expenseDate} • Bởi {expense.paidByEmail === user.email ? 'Bạn' : expense.paidByEmail.split('@')[0]}</p>
-                  </div>
-                </div>
-                <p className="text-lg font-black text-slate-900">{formatCurrency(expense.amount)}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="bg-slate-900 rounded-3xl p-8 shadow-2xl text-white overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-8 opacity-10">
-            <CreditCard className="h-32 w-32 rotate-12" />
-          </div>
-
-          <h2 className="text-2xl font-black mb-2">Trạng thái chốt sổ</h2>
-          <p className="text-slate-400 font-medium mb-8">
-            {pendingSettlement ? `Kỳ tháng ${pendingSettlement.month}, ${pendingSettlement.year}` : 'Hiện không có kỳ chốt sổ nào cần xử lý'}
-          </p>
-
-          <div className="space-y-6 relative">
-            {!pendingSettlement ? (
-              <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/10">
-                <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500">
-                  <Clock className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="font-bold">Đang chờ chốt sổ</p>
-                  <p className="text-xs text-slate-400">Ngày chốt: {user.family.billingDate} hàng tháng</p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/10">
-                <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500">
-                  <Receipt className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="font-bold">Đang xử lý công nợ</p>
-                  <p className="text-xs text-slate-400">Vui lòng thanh toán hoặc xác nhận</p>
-                </div>
-              </div>
-            )}
-
-            {pendingSettlement && (
-              <div className={cn(
-                "p-6 rounded-2xl shadow-xl",
-                pendingSettlement.amount > 0 ? "bg-rose-600" : "bg-emerald-600"
-              )}>
-                <p className="text-sm font-bold text-white/80 uppercase tracking-widest mb-1">
-                  {pendingSettlement.amount > 0 ? 'Bạn cần đóng' : 'Bạn sẽ nhận lại'}
-                </p>
-                <div className="flex items-center justify-between">
-                  <p className="text-3xl font-black">{formatCurrency(Math.abs(pendingSettlement.amount))}</p>
-                  <span className="px-3 py-1 bg-white/20 rounded-full text-[10px] font-black uppercase tracking-tighter backdrop-blur-md">
-                    {pendingSettlement.status === 'PENDING' ? 'Chờ thanh toán' :
-                      pendingSettlement.status === 'WAITING_FOR_CONFIRMATION' ? 'Đợi xác nhận' :
-                        pendingSettlement.status === 'COMPLETED' ? 'Hoàn tất' : pendingSettlement.status}
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-input bg-ink-band-2 border border-ink-band-rule p-5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-ink-band-muted">
+                    {pendingSettlement.amount > 0 ? 'Bạn cần đóng về quỹ' : 'Bạn sẽ nhận lại'}
+                  </p>
+                  <span
+                    className={cn(
+                      'inline-flex items-center rounded-pill px-2.5 py-0.5 text-xs font-medium',
+                      pendingSettlement.status === 'PENDING'
+                        ? 'bg-warning-soft text-warning-ink'
+                        : pendingSettlement.status === 'WAITING_FOR_CONFIRMATION'
+                          ? 'bg-info-soft text-info-ink'
+                          : 'bg-success-soft text-success-ink'
+                    )}
+                  >
+                    {pendingSettlement.status === 'PENDING'
+                      ? 'Chờ thanh toán'
+                      : pendingSettlement.status === 'WAITING_FOR_CONFIRMATION'
+                        ? 'Đợi xác nhận'
+                        : pendingSettlement.status === 'COMPLETED'
+                          ? 'Hoàn tất'
+                          : pendingSettlement.status}
                   </span>
                 </div>
+                <p className="mt-3 font-display text-3xl font-bold text-paper num">
+                  {formatCurrency(Math.abs(pendingSettlement.amount))}
+                </p>
               </div>
-            )}
+            </div>
+          )}
 
-            <Link
-              href="/settlement"
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-4 font-bold text-slate-900 transition-all hover:bg-slate-100 active:scale-95"
-            >
-              Chi tiết công nợ
-            </Link>
-          </div>
+          <Link
+            href="/settlement"
+            className="inline-flex w-full items-center justify-center gap-2 min-h-[44px] rounded-input bg-paper px-4 py-2.5 text-sm font-semibold text-ink hover:bg-paper-2 whitespace-nowrap transition-colors"
+          >
+            <span>Chi tiết công nợ</span>
+            <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
         </section>
       </div>
-    </div>
+    </motion.div>
   );
 }
-

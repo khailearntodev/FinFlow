@@ -11,11 +11,16 @@ interface LogoProps {
 export const Logo = ({ className, variant = 'full' }: LogoProps) => {
   if (variant === 'icon') {
     return (
-      <div className={cn("relative h-14 w-14 overflow-hidden flex items-center justify-center bg-white rounded-2xl shadow-md border border-slate-100", className)}>
+      <div
+        className={cn(
+          'relative h-12 w-12 overflow-hidden flex items-center justify-center bg-surface rounded-input border border-rule',
+          className
+        )}
+      >
         <div className="relative h-full w-[250%]">
           <Image
             src="/finflow-logo.png"
-            alt="FinFlow Icon"
+            alt="Biểu tượng FinFlow"
             fill
             className="object-contain"
             priority
@@ -26,10 +31,10 @@ export const Logo = ({ className, variant = 'full' }: LogoProps) => {
   }
 
   return (
-    <div className={cn("relative h-16 w-full max-w-[224px] flex items-center", className)}>
+    <div className={cn('relative h-12 w-full max-w-[180px] flex items-center', className)}>
       <Image
         src="/finflow-logo.png"
-        alt="FinFlow Logo"
+        alt="FinFlow"
         fill
         className="object-contain object-left"
         priority

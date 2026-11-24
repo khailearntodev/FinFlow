@@ -3,21 +3,19 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  LayoutDashboard, 
-  Receipt, 
-  Users, 
-  CreditCard, 
-  LogOut, 
+import {
+  LayoutDashboard,
+  Receipt,
+  Users,
+  CreditCard,
+  LogOut,
   History,
-  TrendingUp,
-  Settings,
   Menu,
-  X
+  X,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Logo } from './Logo';
-
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { useState } from 'react';
 
@@ -35,92 +33,140 @@ export const Sidebar = () => {
     { name: 'Lịch sử', icon: History, href: '/audit' },
   ];
 
+  const roleLabel = user?.role === 'HEAD' ? 'Chủ hộ' : 'Thành viên';
+
   return (
     <>
-      {/* Mobile Toggle Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="lg:hidden fixed top-4 left-4 z-[60] p-3 bg-white rounded-2xl shadow-xl shadow-indigo-100 border border-slate-100 text-indigo-600 transition-all active:scale-90"
+      {/* Mobile Header Bar */}
+      <div className="lg:hidden fixed top-0 inset-x-0 z-[310] h-16 bg-surface border-b border-rule px-4 flex items-center justify-between">
+        <Link href="/dashboard" onClick={() => setIsOpen(false)} className="flex items-center">
+          <Logo className="h-9 max-w-[132px]" />
+        </Link>
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          aria-label={isOpen ? 'Đóng menu điều hướng' : 'Mở menu điều hướng'}
+          aria-expanded={isOpen}
+          className="flex h-11 w-11 items-center justify-center rounded-input border border-rule bg-paper text-ink hover:bg-paper-2 transition-colors"
+        >
+          {isOpen ? (
+            <X className="h-5 w-5" aria-hidden="true" />
+          ) : (
+            <Menu className="h-5 w-5" aria-hidden="true" />
+          )}
+        </button>
+      </div>
+
+      {/* Mobile Scrim */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 bg-ink/45 z-[290] lg:hidden"
+            onClick={() => setIsOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <aside
+        className={cn(
+          'fixed left-0 top-0 h-dvh w-64 bg-paper-2 border-r border-rule flex flex-col z-[300] transition-transform duration-200 ease-out motion-reduce:transition-none',
+          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        )}
       >
-        {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-      </button>
-
-      {/* Overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden transition-all duration-300"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
-
-      <aside className={cn(
-        "fixed left-0 top-0 h-screen w-72 bg-white border-r border-slate-200 flex flex-col transition-all duration-500 z-50",
-        isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"
-      )}>
-        <div className="p-8">
+        <div className="px-6 py-6 border-b border-rule">
           <Link href="/dashboard" className="block" onClick={() => setIsOpen(false)}>
             <Logo />
           </Link>
+          {user?.family?.name && (
+            <p className="mt-2.5 text-xs font-medium text-muted truncate">
+              {user.family.name}
+            </p>
+          )}
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
-          {menuItems.map((item) => (
-            <Link
-              key={item.name}
-              href={item.href}
-              onClick={() => setIsOpen(false)}
-              className={cn(
-                "flex items-center gap-4 px-4 py-4 rounded-2xl text-sm font-bold transition-all duration-300 group",
-                pathname === item.href
-                  ? "bg-indigo-600 text-white shadow-xl shadow-indigo-200"
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-              )}
-            >
-              <item.icon className={cn(
-                "h-5 w-5 transition-transform duration-300 group-hover:scale-110",
-                pathname === item.href ? "text-white" : "text-slate-400 group-hover:text-indigo-600"
-              )} />
-              {item.name}
-            </Link>
-          ))}
+        <nav aria-label="Điều hướng chính" className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {menuItems.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                onClick={() => setIsOpen(false)}
+                aria-current={isActive ? 'page' : undefined}
+                className={cn(
+                  'relative flex items-center gap-3 px-3.5 py-2.5 min-h-[44px] rounded-input text-sm font-medium whitespace-nowrap transition-colors',
+                  isActive
+                    ? 'text-accent-ink'
+                    : 'text-ink-2 hover:bg-paper-3/70 hover:text-ink'
+                )}
+              >
+                {isActive && (
+                  <motion.span
+                    layoutId="sidebar-active-pill"
+                    transition={{ type: 'spring', stiffness: 460, damping: 36 }}
+                    className="absolute inset-0 rounded-input bg-accent"
+                    aria-hidden="true"
+                  />
+                )}
+                <item.icon
+                  className={cn(
+                    'relative z-10 h-[18px] w-[18px] shrink-0',
+                    isActive ? 'text-accent-ink' : 'text-muted'
+                  )}
+                  aria-hidden="true"
+                />
+                <span className="relative z-10">{item.name}</span>
+              </Link>
+            );
+          })}
         </nav>
 
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-          <Link 
-            href="/profile" 
+        <div className="p-3 border-t border-rule space-y-1.5">
+          <Link
+            href="/profile"
             onClick={() => setIsOpen(false)}
-            className="block mb-4 px-4 py-4 bg-white rounded-2xl border border-slate-100 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-50 transition-all group"
+            className={cn(
+              'flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-input border transition-colors',
+              pathname === '/profile'
+                ? 'bg-surface border-accent text-ink'
+                : 'bg-surface/80 border-rule hover:bg-surface hover:border-rule-strong'
+            )}
           >
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-black uppercase group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
-                {user?.fullName?.charAt(0) || 'U'}
-              </div>
-              <div className="overflow-hidden">
-                <p className="text-sm font-black text-slate-900 truncate">{user?.fullName || 'Người dùng'}</p>
-                <p className="text-[10px] font-bold text-slate-400 truncate uppercase tracking-tight">{user?.role}</p>
-              </div>
+            <div className="h-9 w-9 shrink-0 rounded-input bg-accent-soft text-accent font-display font-bold text-sm flex items-center justify-center">
+              {user?.fullName?.charAt(0)?.toUpperCase() || 'U'}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-ink truncate">
+                {user?.fullName || 'Người dùng'}
+              </p>
+              <p className="text-xs text-muted truncate">{roleLabel}</p>
             </div>
           </Link>
 
           <button
+            type="button"
             onClick={() => setIsLogoutModalOpen(true)}
-            className="flex w-full items-center gap-4 px-4 py-4 rounded-2xl text-sm font-bold text-red-500 hover:bg-red-50 transition-all group"
+            className="flex w-full items-center gap-3 px-3.5 py-2.5 min-h-[44px] rounded-input text-sm font-medium text-error-ink hover:bg-error-soft whitespace-nowrap transition-colors"
           >
-            <LogOut className="h-5 w-5 transition-transform duration-300 group-hover:-translate-x-1" />
-            Đăng xuất
+            <LogOut className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+            <span>Đăng xuất</span>
           </button>
         </div>
-
-        <ConfirmModal
-          isOpen={isLogoutModalOpen}
-          onClose={() => setIsLogoutModalOpen(false)}
-          onConfirm={logout}
-          title="Đăng xuất"
-          message="Bạn có chắc chắn muốn đăng xuất khỏi hệ thống FinFlow?"
-          type="warning"
-          confirmText="Đăng xuất"
-        />
       </aside>
+
+      <ConfirmModal
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        onConfirm={logout}
+        title="Đăng xuất khỏi FinFlow"
+        message="Bạn có chắc chắn muốn kết thúc phiên làm việc hiện tại?"
+        type="warning"
+        confirmText="Đăng xuất"
+      />
     </>
   );
 };
